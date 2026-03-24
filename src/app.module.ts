@@ -4,7 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { RequestModule } from './Requests/requests.module';
 import { Settings } from './Settings/settings.entity';
 import { SettingsModule } from './Settings/settings.module';
-
+import { ProfileModule } from './Profile/profile.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -23,6 +23,7 @@ import { SettingsModule } from './Settings/settings.module';
     }),
     RequestModule,
     SettingsModule,
+    ProfileModule,
   ],
   controllers: [],
   providers: [],
