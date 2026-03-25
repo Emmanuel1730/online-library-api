@@ -3,7 +3,15 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  OneToMany,
 } from 'typeorm';
+import { Request } from '../Requests/request.entity';
+
+export enum UserRole {
+  STUDENT = 'STUDENT',
+  TEACHER = 'TEACHER',
+  ADMIN = 'ADMIN',
+}
 
 @Entity()
 export class Profile {
@@ -28,8 +36,12 @@ export class Profile {
   @Column()
   password: string;
 
-  @Column({ default: 'MEMBER' })
-  role: string;
+  @Column({
+    type: 'enum',
+    enum: UserRole,
+    default: UserRole.STUDENT, // Most users will be students
+  })
+  role: UserRole;
 
   @Column({ unique: true })
   libraryCardNumber: string;
@@ -39,4 +51,10 @@ export class Profile {
 
   @CreateDateColumn()
   joinDate: Date;
+
+  @OneToMany(() => Request, (request) => request.user)
+  requests: Request[];
+
+  @Column({ nullable: true })
+  refreshToken: string;
 }

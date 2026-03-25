@@ -1,9 +1,11 @@
+import { Profile } from 'src/Profile/profile.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
 } from 'typeorm';
 
 @Entity()
@@ -16,9 +18,6 @@ export class Request {
 
   @Column()
   fromUser: string; // e.g., "T. Banda, Blantyre..."
-
-  @Column({ nullable: true })
-  userId: number; // To accurately link to the Profile/User table
 
   @Column()
   type: string; // e.g., "Upload" or "Registration"
@@ -37,4 +36,7 @@ export class Request {
 
   @UpdateDateColumn()
   updatedAt: Date; // Automatically updates whenever the row changes!
+
+  @ManyToOne(() => Profile, (profile) => profile.requests)
+  user: Profile;
 }

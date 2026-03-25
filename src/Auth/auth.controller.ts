@@ -10,4 +10,14 @@ export class AuthController {
   signIn(@Body() signInDto: Record<string, any>) {
     return this.authService.login(signInDto.email, signInDto.password);
   }
+  @Post('register')
+  async register(@Body() signUpDto: any) {
+    const result = await this.authService.register(signUpDto);
+    return result;
+  }
+  @Post('refresh')
+  async refreshTokens(@Body() body: any) {
+    // We expect the frontend/Postman to send the user's ID and their Refresh Token in the JSON body
+    return this.authService.refreshToken(body.userId, body.refreshToken);
+  }
 }
