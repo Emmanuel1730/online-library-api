@@ -16,6 +16,12 @@ export class Profile {
   @Column()
   lastName: string;
 
+  @Column({ nullable: true })
+  bio: string;
+
+  @Column({ nullable: true })
+  age: number;
+
   @Column({ unique: true })
   email: string;
 

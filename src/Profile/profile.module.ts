@@ -8,5 +8,6 @@ import { Profile } from './profile.entity';
   imports: [TypeOrmModule.forFeature([Profile])], // Connects your database table
   controllers: [ProfileController],
   providers: [ProfileService],
+  exports: [ProfileService], //this shares with auth module
 })
 export class ProfileModule {}

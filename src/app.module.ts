@@ -5,6 +5,8 @@ import { RequestModule } from './Requests/requests.module';
 import { Settings } from './Settings/settings.entity';
 import { SettingsModule } from './Settings/settings.module';
 import { ProfileModule } from './Profile/profile.module';
+import { Profile } from './Profile/profile.entity';
+import { AuthModule } from './Auth/auth.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -16,7 +18,7 @@ import { ProfileModule } from './Profile/profile.module';
       username: process.env.DB_USER,
       password: process.env.DB_PASS,
       database: process.env.DB_NAME,
-      entities: [Request, Settings], //Reg entities
+      entities: [Request, Settings, Profile], //Reg entities
       autoLoadEntities: true,
       synchronize: true,
       //this will auto create tables
@@ -24,6 +26,7 @@ import { ProfileModule } from './Profile/profile.module';
     RequestModule,
     SettingsModule,
     ProfileModule,
+    AuthModule,
   ],
   controllers: [],
   providers: [],

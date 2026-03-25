@@ -20,4 +20,9 @@ export class ProfileService {
   getAllProfiles() {
     return this.profileRepository.find();
   }
+
+  // 3. Find a specific user by their email for login
+  async findByEmail(email: string): Promise<Profile | null> {
+    return this.profileRepository.findOne({ where: { email } });
+  }
 }
