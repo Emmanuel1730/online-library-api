@@ -20,4 +20,22 @@ export class AuthController {
     // We expect the frontend/Postman to send the user's ID and their Refresh Token in the JSON body
     return this.authService.refreshToken(body.userId, body.refreshToken);
   }
+
+  @Post('logout')
+  //@HttpCode(HttpStatus.OK)
+  async logout(@Body() body: { userId: number }) {
+    return await this.authService.logout(body.userId);
+  }
+
+  @Post('forgot-password')
+  async forgotPassword(@Body('email') email: string) {
+    return await this.authService.forgotPassword(email);
+  }
+  @Post('reset-password')
+  async resetPassword(
+    @Body('token') token: string,
+    @Body('newPassword') newPassword: string,
+  ) {
+    return await this.authService.resetPassword(token, newPassword);
+  }
 }

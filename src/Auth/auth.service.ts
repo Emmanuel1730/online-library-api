@@ -2,10 +2,12 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ProfileService } from '../Profile/profile.service';
-
+import * as crypto from 'crypto'; // Built-in Node.js module
+import { MoreThan } from 'typeorm';
 @Injectable()
 export class AuthService {
   constructor(
@@ -110,5 +112,65 @@ export class AuthService {
     });
 
     return tokens;
+  }
+  // In auth.service.ts
+  async logout(userId: number) {
+    // 1. Force convert to number just in case
+    const id = Number(userId);
+
+    // 2. Perform the update
+    const result = await this.profileService.updateProfile(id, {
+      refreshToken: null,
+    });
+
+    // 3. Log this so you can see it in your terminal!
+    console.log(`Logout attempt for ID ${id}:`, result);
+
+    return { message: 'Logged out successfully' };
+  }
+  async forgotPassword(email: string) {
+    // 1. Find the user
+    const user = await this.profileService.findByEmail(email);
+    if (!user) {
+      throw new NotFoundException('No account found with that email');
+    }
+
+    // 2. Generate a random 20-character hex token
+    const resetToken = crypto.randomBytes(20).toString('hex');
+
+    // 3. Set expiration for 1 hour from now
+    const expires = new Date();
+    expires.setHours(expires.getHours() + 1);
+
+    // 4. Save to database
+    await this.profileService.updateProfile(user.id, {
+      resetPasswordToken: resetToken,
+      resetPasswordExpires: expires,
+    });
+
+    // 5. In a real app, you'd send an email here.
+    // For testing, we return the token so we can use it for the next step.
+    return {
+      message: 'Reset token generated successfully',
+      resetToken: resetToken, // Copy this from Postman later!
+    };
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    // 1. Ask ProfileService to find the user
+    const user = await this.profileService.findByResetToken(token);
+
+    if (!user) {
+      throw new UnauthorizedException('Reset token is invalid or has expired');
+    }
+
+    // 2. Use your existing updateProfile method to save the new password and clear tokens
+    await this.profileService.updateProfile(user.id, {
+      password: newPassword, // Note: In a real app, hash this first!
+      resetPasswordToken: null,
+      resetPasswordExpires: null,
+    });
+
+    return { message: 'Password has been reset successfully' };
   }
 }

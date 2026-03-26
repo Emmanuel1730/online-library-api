@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Profile } from './profile.entity';
 import { Request } from '../Requests/request.entity';
-
+import { MoreThan } from 'typeorm';
 @Injectable()
 export class ProfileService {
   constructor(
@@ -34,12 +34,19 @@ export class ProfileService {
     });
   }
   // 4. Update a profile (used for saving refresh tokens)
+
+  // In profile.service.ts
   async updateProfile(id: number, attrs: Partial<Profile>) {
-    const profile = await this.profileRepository.findOne({ where: { id } });
-    if (!profile) {
-      throw new Error('Profile not found');
-    }
-    Object.assign(profile, attrs);
-    return await this.profileRepository.save(profile);
+    // .update() is more direct than .save() and handles nulls perfectly
+    return await this.profileRepository.update(id, attrs);
+  }
+
+  async findByResetToken(token: string) {
+    return await this.profileRepository.findOne({
+      where: {
+        resetPasswordToken: token,
+        resetPasswordExpires: MoreThan(new Date()),
+      },
+    });
   }
 }

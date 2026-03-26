@@ -1,50 +1,27 @@
-import {
-  Injectable,
-  CanActivate,
-  ExecutionContext,
-  UnauthorizedException,
-  ForbiddenException,
-} from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { Role } from './role.enum';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
-  // We bring in the JwtService to mathematically verify the token
-  constructor(private jwtService: JwtService) {}
+  constructor(private reflector: Reflector) {}
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
+  canActivate(context: ExecutionContext): boolean {
+    // 1. Get the roles required for this specific route
+    const requiredRoles = this.reflector.getAllAndOverride<Role[]>('roles', [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
-    // 1. Look for the "Authorization" header
-    const authHeader = request.headers.authorization;
-    if (!authHeader) {
-      throw new UnauthorizedException('Access Denied: No token provided!');
+    // 2. If no roles are defined on the route, allow access
+    if (!requiredRoles) {
+      return true;
     }
 
-    // 2. Extract the token (It usually looks like "Bearer eyJhbG...")
-    const token = authHeader.split(' ')[1];
+    // 3. Get the user from the request (attached by your Auth strategy)
+    const { user } = context.switchToHttp().getRequest();
 
-    try {
-      // 3. Verify the token using your secret key!
-      // (This MUST match the secret in your auth.module.ts)
-      const payload = await this.jwtService.verifyAsync(token, {
-        secret: 'MY_SUPER_SECRET_KEY_123',
-      });
-
-      // 4. Attach the user's data to the request so the rest of the app can see it
-      request['user'] = payload;
-
-      // 5. Finally, check if they are an ADMIN
-      if (payload.role === 'ADMIN') {
-        return true; // The bouncer opens the door!
-      } else {
-        throw new ForbiddenException('Access Denied: You must be an Admin!');
-      }
-    } catch (error) {
-      // If the token is fake, expired, or tampered with, kick them out
-      throw new UnauthorizedException(
-        'Access Denied: Invalid or expired token!',
-      );
-    }
+    // 4. Check if the user has one of the required roles
+    return requiredRoles.some((role) => user.role === role);
   }
 }

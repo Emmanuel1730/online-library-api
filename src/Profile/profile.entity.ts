@@ -55,6 +55,12 @@ export class Profile {
   @OneToMany(() => Request, (request) => request.user)
   requests: Request[];
 
-  @Column({ nullable: true })
-  refreshToken: string;
+  @Column({ type: 'varchar', nullable: true })
+  refreshToken: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  resetPasswordToken: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  resetPasswordExpires: Date | null;
 }
