@@ -1,37 +1,45 @@
-import { CreateProfileDto } from './create-profile.dto';
 import {
-  Body,
   Controller,
   Get,
   Post,
+  Body,
   UseGuards,
-  Request as Req,
+  Request,
 } from '@nestjs/common';
-import { ProfileService } from './profile.service';
-import { Profile } from './profile.entity';
-import { RolesGuard } from 'src/Auth/roles.guard';
-import { TokenExpiredError } from '@nestjs/jwt';
+import { AuthGuard } from '@nestjs/passport'; // Built-in NestJS JWT Guard
 
-@Controller('api/profiles') // This sets your URL to http://localhost:3000/api/profiles
+// --- PROFILES IMPORTS (Same Folder) ---
+import { ProfileService } from './profile.service';
+import { CreateProfileDto } from './create-profile.dto';
+import { Role } from 'src/Auth/role.enum';
+// --- AUTH IMPORTS (Cross Folder) ---
+// Notice the capital 'A' to match your folder structure exactly!
+import { RolesGuard } from '../Auth/roles.guard';
+import { Roles } from '../Auth/roles.decorator';
+
+@UseGuards(AuthGuard('jwt'), RolesGuard) // Checks token FIRST, then checks Role
+@Controller('api/profiles')
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
 
-  // Route to create a new user in Postman
+  @Roles(Role.ADMIN)
+  @Get()
+  getAllProfiles() {
+    return this.profileService.getAllProfiles();
+  }
+  // 1. Route to create a new user
   @Post()
   createProfile(@Body() profileData: CreateProfileDto) {
     return this.profileService.createProfile(profileData);
   }
 
-  @UseGuards(RolesGuard)
-  // Route to see all users in Postman
+  // 2. Route to see YOUR OWN profile
+
   @Get('me')
-  async getMyprofile(@Req() req) {
-    //req.user.sub is the ID stored in the JWT token
-    const userId = req.user.sub;
+  async getMyprofile(@Request() req) {
+    const userId = req.user.id;
     return this.profileService.getProfileWithRequests(userId);
   }
 
-  getAllProfiles() {
-    return this.profileService.getAllProfiles();
-  }
+  // 3. Route to see ALL users (ONLY Admins)
 }

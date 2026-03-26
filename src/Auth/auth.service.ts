@@ -1,5 +1,7 @@
 import {
   Injectable,
+  Inject,
+  forwardRef,
   UnauthorizedException,
   ConflictException,
   NotFoundException,
@@ -11,6 +13,7 @@ import { MoreThan } from 'typeorm';
 @Injectable()
 export class AuthService {
   constructor(
+    @Inject(forwardRef(() => ProfileService))
     private profileService: ProfileService,
     private jwtService: JwtService,
   ) {}
@@ -79,7 +82,7 @@ export class AuthService {
       // 1. The short-lived Access Token (15 minutes)
       this.jwtService.signAsync(payload, {
         expiresIn: '15m',
-        secret: process.env.JWT_SECRET || 'your-secret-key', // Use your standard secret
+        secret: process.env.JWT_SECRET || 'MY_SUPER_SECRET_KEY_123', // Use your standard secret
       }),
       // 2. The long-lived Refresh Token (7 days)
       this.jwtService.signAsync(payload, {

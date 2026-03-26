@@ -1,27 +1,60 @@
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Role } from './role.enum';
+import { Roles } from './roles.decorator';
+import { decorate } from 'reflect-metadata/no-conflict';
+
+// ... imports at the top remain the same
 
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    // 1. Get the roles required for this specific route
+    // 1. Keep this: Get the roles required for this specific route
+
     const requiredRoles = this.reflector.getAllAndOverride<Role[]>('roles', [
       context.getHandler(),
       context.getClass(),
     ]);
 
-    // 2. If no roles are defined on the route, allow access
     if (!requiredRoles) {
       return true;
     }
 
-    // 3. Get the user from the request (attached by your Auth strategy)
-    const { user } = context.switchToHttp().getRequest();
+    // --- PASTE THE NEW CODE STARTING HERE ---
 
-    // 4. Check if the user has one of the required roles
-    return requiredRoles.some((role) => user.role === role);
+    const request = context.switchToHttp().getRequest();
+    const user = request.user;
+
+    // These logs will appear in your VS Code terminal when you try to access the route
+    console.log(request.user);
+    console.log(requiredRoles);
+
+    if (!user || !user.role) {
+      console.error('Access Denied: No user or role found on request object');
+      return false;
+    }
+
+    const hasRole = requiredRoles.some(
+      (role) => user.role?.toUpperCase() === role.toUpperCase(),
+    );
+
+    // Using toLowerCase() on both sides makes the check case-insensitive
+
+    // --- END OF NEW CODE ---
+
+    if (!hasRole) {
+      throw new ForbiddenException(
+        'You do not have permission to access this resource',
+      );
+    }
+
+    return true;
   }
 }
