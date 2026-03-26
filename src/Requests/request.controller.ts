@@ -1,37 +1,47 @@
 import {
-  Body,
   Controller,
   Get,
   Post,
+  Body,
   Patch,
   Param,
   Delete,
+  UseGuards,
+  Request as Req,
 } from '@nestjs/common';
 import { RequestService } from './request.service';
-import { Request as RequestEntity } from './request.entity';
-@Controller('api/request') // This matches your Postman URL: localhost:3000/api/request
-export class RequestController {
-  constructor(private readonly requestService: RequestService) {}
+import { CreateRequestDto } from './create-request.dto';
+import { RolesGuard } from '../Auth/roles.guard';
+import { Roles } from '../Auth/roles.decorator'; // You'll need this simple decorator
+import { Role } from '../Auth/role.enum';
 
-  @Get() // This handles: GET localhost:3000/api/request
+@Controller('api/request')
+@UseGuards(RolesGuard) // Apply the bouncer to the whole controller
+export class RequestsController {
+  constructor(private readonly requestsService: RequestService) {}
+
+  @Get()
+  @Roles(Role.ADMIN, Role.TEACHER) // Only Admin and Teachers see all requests
   getAllRequests() {
-    return this.requestService.findAll();
+    return this.requestsService.findAll();
   }
+
   @Post()
-  async createRequest(@Body() requestData: Partial<RequestEntity>) {
-    //adding await and return ensures the full saved object is sent to postman
-    const result = await this.requestService.create(requestData);
-    return result;
+  @Roles(Role.STUDENT, Role.TEACHER) // Students and Teachers can request books
+  async createRequest(@Body() createRequestDto: CreateRequestDto, @Req() req) {
+    const userId = req.user.sub;
+    return this.requestsService.create(createRequestDto, userId);
   }
+
   @Patch(':id/status')
+  @Roles(Role.ADMIN) // ONLY the Librarian (Admin) can approve/reject
   async updateStatus(@Param('id') id: number, @Body('status') status: string) {
-    const result = await this.requestService.updateStatus(id, status);
-    return result;
+    return this.requestsService.updateStatus(id, status);
   }
 
   @Delete(':id')
+  @Roles(Role.ADMIN) // Only Admin can delete records
   async remove(@Param('id') id: number) {
-    await this.requestService.remove(id);
-    return { message: `Request ${id} successfully delete ` }; // return a success message
+    return this.requestsService.remove(id);
   }
 }
