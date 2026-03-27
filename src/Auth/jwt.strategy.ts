@@ -1,27 +1,35 @@
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config'; // <--- ADD THIS IMPORT
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtUser } from './jwt-user.inteface';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(private configService: ConfigService) {
+  constructor(private readonly configService: ConfigService) {
+    const secret = configService.get<string>('JWT_SECRET');
+
+    if (!secret) {
+      throw new Error('JWT_SECRET is missing in environment variables');
+    }
+
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      // Add the "||" fallback to satisfy TypeScript
-      secretOrKey:
-        configService.get<string>('JWT_SECRET') || 'MY_SUPER_SECRET_KEY_123',
+      secretOrKey: secret,
     });
   }
 
-  // This function automatically decodes the token and attaches the info to req.user
-  async validate(payload: any) {
-    console.log('Token Payload received:', payload);
+  async validate(payload: any): Promise<JwtUser> {
+    if (!payload) {
+      throw new UnauthorizedException('Invalid token');
+    }
+
     return {
       id: payload.sub,
       email: payload.email,
       role: payload.role,
+      schoolId: payload.schoolId ?? null,
     };
   }
 }

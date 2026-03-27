@@ -1,4 +1,5 @@
-import { IsString, IsUUID, IsEnum } from 'class-validator';
+import { IsString, IsEnum, IsUUID } from 'class-validator';
+import { ResourceVisibility } from './resource-visibility.enum';
 
 export class CreateResourceWithFileDto {
   @IsString()
@@ -10,12 +11,6 @@ export class CreateResourceWithFileDto {
   @IsUUID()
   categoryId: string;
 
-  @IsUUID()
-  schoolId: string;
-
-  @IsUUID()
-  uploaderId: string;
-
-  @IsEnum(['public', 'school', 'restricted'])
-  visibility: 'public' | 'school' | 'restricted';
+  @IsEnum(ResourceVisibility)
+  visibility: ResourceVisibility;
 }

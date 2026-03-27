@@ -18,23 +18,14 @@ export class UploadsService {
       throw new BadRequestException('File is required');
     }
 
-    // 1. Upload to Supabase
     const fileUrl = await this.supabaseService.uploadFile(file);
 
-    // 2. Save to DB
     const upload = this.uploadRepo.create({
       fileUrl,
       fileType: file.mimetype,
+      resource: dto.resourceId ? ({ id: dto.resourceId } as any) : null,
     });
 
-    const saved = await this.uploadRepo.save(upload);
-
-    // 3. Return structured response
-    return {
-      id: saved.id,
-      fileUrl: saved.fileUrl,
-      fileType: saved.fileType,
-      ...dto,
-    };
+    return this.uploadRepo.save(upload);
   }
 }

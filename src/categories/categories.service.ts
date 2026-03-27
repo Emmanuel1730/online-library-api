@@ -5,19 +5,30 @@ import { Repository } from 'typeorm';
 
 @Injectable()
 export class CategoriesService {
-    constructor(
-        @InjectRepository(Category)
-        private repo: Repository<Category>,
-    ) {}
+  constructor(
+    @InjectRepository(Category)
+    private repo: Repository<Category>,
+  ) {}
 
-    async create(data: any) {
-        const category = this.repo.create(data);
-        return this.repo.save(category);
-    }
+  // CREATE CATEGORY (forced school binding)
+  async create(dto: any, user: any) {
+    const category = this.repo.create({
+      name: dto.name,
+      school: user.school, // 🔥 enforced from token
+    });
 
-    findAll(){
-        return this.repo.find({
-            relations: ['school', 'resources'],
-        })
-    }
+    return this.repo.save(category);
+  }
+
+  // GET ONLY SCHOOL CATEGORIES
+  async findAll(user: any) {
+    return this.repo.find({
+      where: {
+        school: {
+          id: user.school.id,
+        },
+      },
+      relations: ['school', 'resources'],
+    });
+  }
 }

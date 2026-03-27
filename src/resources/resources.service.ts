@@ -11,7 +11,8 @@ import { Upload } from 'src/uploads/uploads.entity';
 import { SupabaseService } from 'src/supabase/supabase.service';
 import { CreateResourceWithFileDto } from './create-resource-with-file.dto';
 import { School } from 'src/school/school.entity';
-import { Profile, UserRole } from 'src/Profile/profile.entity';
+import { UserRole } from 'src/Profile/profile.entity';
+import { JwtUser } from 'src/Auth/jwt-user.inteface';
 
 @Injectable()
 export class ResourcesService {
@@ -28,56 +29,50 @@ export class ResourcesService {
     private supabaseService: SupabaseService,
   ) {}
 
-  // ✅ CREATE WITH RBAC
   async createWithFile(
     file: Express.Multer.File,
     dto: CreateResourceWithFileDto,
-    user: Profile, // 🔥 IMPORTANT
+    user: JwtUser,
   ) {
-    if (!file) {
-      throw new BadRequestException('File is required');
-    }
+    if (!file) throw new BadRequestException('File required');
 
-    // ❌ BLOCK STUDENTS
+    // RBAC
     if (user.role === UserRole.STUDENT) {
       throw new ForbiddenException('Students cannot upload');
     }
 
-    const school = await this.schoolRepo.findOne({
-      where: { id: dto.schoolId },
-    });
+    const schoolId = user.schoolId;
 
-    if (!school) {
+    if (user.role !== UserRole.ADMIN && !schoolId) {
+      throw new ForbiddenException('Missing school context');
+    }
+
+    const school = schoolId
+      ? await this.schoolRepo.findOne({ where: { id: schoolId } })
+      : null;
+
+    if (user.role !== UserRole.ADMIN && !school) {
       throw new BadRequestException('Invalid school');
     }
 
-    // ❌ TEACHER PERMISSION CHECK
-    if (
-      user.role === UserRole.TEACHER &&
-      school.teachersCanUpload === false
-    ) {
-      throw new ForbiddenException('Teachers not allowed to upload');
-    }
-
-    // 1. Upload file
     const fileUrl = await this.supabaseService.uploadFile(file);
 
-    // 2. Create resource
     const resource = this.resourceRepo.create({
       title: dto.title,
       description: dto.description,
       visibility: dto.visibility,
       category: { id: dto.categoryId } as any,
-      school: { id: dto.schoolId } as any,
-      uploader: { id: user.id } as any, // 🔥 NEVER trust dto uploaderId
+      school: schoolId ? ({ id: schoolId } as any) : null,
+      uploader: { id: user.id } as any,
     });
 
     const savedResource = await this.resourceRepo.save(resource);
 
-    // 3. Save upload
     const upload = this.uploadRepo.create({
       fileUrl,
       fileType: file.mimetype,
+      uploaderId: String(user.id),
+      schoolId: String(user.schoolId),
       resource: savedResource,
     });
 
@@ -89,26 +84,68 @@ export class ResourcesService {
     };
   }
 
-  // ✅ RBAC + MULTI SCHOOL + VISIBILITY
-  async findAll(user: Profile) {
-    const query = this.resourceRepo
+  async findAll(user: JwtUser, query: any) {
+    const page = Number(query.page ?? 1);
+    const limit = Number(query.limit ?? 10);
+    const skip = (page - 1) * limit;
+
+    const search = query.search ?? '';
+    const categoryId = query.categoryId;
+    const visibility = query.visibility;
+
+    const qb = this.resourceRepo
       .createQueryBuilder('resource')
       .leftJoinAndSelect('resource.category', 'category')
       .leftJoinAndSelect('resource.school', 'school')
       .leftJoinAndSelect('resource.uploader', 'uploader')
       .leftJoinAndSelect('resource.uploads', 'uploads')
-      .where('resource.isActive = :isActive', { isActive: true });
+      .where('resource.isActive = true');
 
-    if (user.role !== UserRole.ADMIN) {
-      query.andWhere(
-        `(resource.visibility = :public OR resource.schoolId = :schoolId)`,
-        {
-          public: 'public',
-          schoolId: user.school.id,
-        },
+    // SCHOOL ISOLATION
+    if (user.role !== UserRole.ADMIN && user.schoolId) {
+      qb.andWhere('school.id = :schoolId', {
+        schoolId: user.schoolId,
+      });
+    }
+
+    if (search) {
+      qb.andWhere(
+        '(resource.title ILIKE :search OR resource.description ILIKE :search)',
+        { search: `%${search}%` },
       );
     }
 
-    return query.getMany();
+    if (categoryId) {
+      qb.andWhere('category.id = :categoryId', { categoryId });
+    }
+
+    if (visibility) {
+      qb.andWhere('resource.visibility = :visibility', {
+        visibility,
+      });
+    }
+
+    qb.skip(skip).take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        lastPage: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async incrementDownload(resourceId: string) {
+    await this.resourceRepo.increment(
+      { id: resourceId },
+      'downloadCount',
+      1,
+    );
+
+    return { message: 'Download tracked' };
   }
 }

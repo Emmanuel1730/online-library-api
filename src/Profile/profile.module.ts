@@ -6,7 +6,10 @@ import { Profile } from './profile.entity';
 import { AuthModule } from 'src/Auth/auth.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Profile]), forwardRef(() => AuthModule)], // Connects your database table
+  imports: [
+    TypeOrmModule.forFeature([Profile]), 
+    forwardRef(() => AuthModule,
+  )], // Connects your database table
   controllers: [ProfileController],
   providers: [ProfileService],
   exports: [ProfileService], //this shares with auth module

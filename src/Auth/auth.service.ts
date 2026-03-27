@@ -9,6 +9,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ProfileService } from '../Profile/profile.service';
 import * as crypto from 'crypto';
+import { UserRole } from '../Profile/profile.entity';
 
 @Injectable()
 export class AuthService {
@@ -25,8 +26,9 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    // 🔥 IMPORTANT: ensure school is loaded
-    if (!user.school) {
+    const schoolId: string | null = user.school?.id ?? null;
+
+    if (user.role !== UserRole.ADMIN && !schoolId) {
       throw new UnauthorizedException('User has no associated school');
     }
 
@@ -34,7 +36,7 @@ export class AuthService {
       user.id,
       user.email,
       user.role,
-      user.school.id, // ✅ FIX
+      schoolId,
     );
 
     await this.profileService.updateProfile(user.id, {
@@ -61,7 +63,9 @@ export class AuthService {
     const savedUser =
       await this.profileService.createProfile(signUpDto);
 
-    if (!savedUser.school) {
+    const schoolId: string | null = savedUser.school?.id ?? null;
+
+    if (savedUser.role !== UserRole.ADMIN && !schoolId) {
       throw new UnauthorizedException(
         'User must belong to a school',
       );
@@ -71,7 +75,7 @@ export class AuthService {
       savedUser.id,
       savedUser.email,
       savedUser.role,
-      savedUser.school.id, // ✅ FIX
+      schoolId,
     );
 
     await this.profileService.updateProfile(savedUser.id, {
@@ -84,24 +88,26 @@ export class AuthService {
     };
   }
 
-  // ✅ UPDATED TOKEN GENERATION
   async generateTokens(
     userId: number,
     email: string,
     role: string,
-    schoolId: string, // ✅ NEW
+    schoolId: string | null,
   ) {
-    const payload = {
+    const payload: any = {
       sub: userId,
       email,
       role,
-      schoolId, // ✅ CRITICAL
     };
+
+    if (schoolId) {
+      payload.schoolId = schoolId;
+    }
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
-        expiresIn: '15m',
-        secret: process.env.JWT_SECRET || 'MY_SUPER_SECRET_KEY_123', // Use your standard secret
+        expiresIn: '1h',
+        secret: process.env.JWT_SECRET || 'MY_SUPER_SECRET_KEY_123',
       }),
       this.jwtService.signAsync(payload, {
         expiresIn: '7d',
@@ -125,32 +131,24 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    if (!user.school) {
+    const schoolId: string | null = user.school?.id ?? null;
+
+    if (user.role !== UserRole.ADMIN && !schoolId) {
       throw new UnauthorizedException('User has no school');
     }
 
-    const tokens = await this.generateTokens(
+    return this.generateTokens(
       user.id,
       user.email,
       user.role,
-      user.school.id, // ✅ FIX
+      schoolId,
     );
-
-    await this.profileService.updateProfile(user.id, {
-      refreshToken: tokens.refresh_token,
-    });
-
-    return tokens;
   }
 
   async logout(userId: number) {
-    const id = Number(userId);
-
-    const result = await this.profileService.updateProfile(id, {
+    await this.profileService.updateProfile(userId, {
       refreshToken: null,
     });
-
-    console.log(`Logout attempt for ID ${id}:`, result);
 
     return { message: 'Logged out successfully' };
   }

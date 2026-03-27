@@ -1,18 +1,23 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards, Req } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
+import { JwtAuthGuard } from 'src/Auth/jwt-auth-guard';
+import { CreateCategoryDto } from './create-categories.dto';
 
 @Controller('categories')
 export class CategoriesController {
-    constructor(private service: CategoriesService) {}
+  constructor(private service: CategoriesService) {}
 
-    @Post()
-    create(@Body() data: any) {
-        return this.service.create(data);
-    }
+  // 🔒 PROTECTED CREATE
+  @UseGuards(JwtAuthGuard)
+  @Post()
+  create(@Req() req, @Body() dto: CreateCategoryDto) {
+    return this.service.create(dto, req.user);
+  }
 
-    @Get()
-    findAll() {
-        return this.service.findAll();
-    }
-
+  // 🔒 OPTIONAL: also protect (recommended for isolation)
+  @UseGuards(JwtAuthGuard)
+  @Get()
+  findAll(@Req() req) {
+    return this.service.findAll(req.user);
+  }
 }

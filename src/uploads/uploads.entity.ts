@@ -1,5 +1,3 @@
-// src/uploads/uploads.entity.ts
-
 import { Resource } from 'src/resources/resources.entity';
 import {
   Entity,
@@ -19,6 +17,15 @@ export class Upload {
 
   @Column()
   fileType: string;
+
+  @Column()
+  schoolId: string;
+
+  @Column()
+  uploaderId: string;
+
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  createdAt: Date;
 
   @ManyToOne(() => Resource, (resource) => resource.uploads, {
     onDelete: 'CASCADE',

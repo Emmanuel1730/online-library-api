@@ -14,8 +14,7 @@ export class School {
   @Column({ nullable: true })
   location: string;
 
-  // ✅ UPLOAD CONTROL
-  @Column({ default: false })
+  @Column({ default: true })
   teachersCanUpload: boolean;
 
   @OneToMany(() => Profile, (profile) => profile.school)

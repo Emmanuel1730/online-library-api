@@ -1,39 +1,44 @@
 import {
   IsString,
   IsEmail,
-  IsNotEmpty,
-  MinLength,
   IsOptional,
+  IsEnum,
+  IsUUID,
   IsInt,
-  Min,
 } from 'class-validator';
+import { UserRole } from './profile.entity';
 
 export class CreateProfileDto {
   @IsString()
-  @IsNotEmpty()
   firstName: string;
 
   @IsString()
-  @IsNotEmpty()
   lastName: string;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   bio?: string;
 
-  @IsInt()
-  @Min(0)
   @IsOptional()
+  @IsInt()
   age?: number;
 
-  @IsEmail({}, { message: 'Please provide a valid email address' })
+  @IsEmail()
   email: string;
 
   @IsString()
-  @MinLength(6, { message: 'Password must be at least 6 characters long' })
   password: string;
 
+  // role optional (defaults handled in service if needed)
+  @IsOptional()
+  @IsEnum(UserRole)
+  role?: UserRole;
+
   @IsString()
-  @IsNotEmpty()
   libraryCardNumber: string;
+
+  // 🔴 FIX: optional for ADMIN, required logic moved to service
+  @IsOptional()
+  @IsUUID()
+  schoolId?: string;
 }

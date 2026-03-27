@@ -3,6 +3,7 @@ import { Profile } from 'src/Profile/profile.entity';
 import { Quiz } from 'src/quizzes/quizzes.entity';
 import { School } from 'src/school/school.entity';
 import { Upload } from 'src/uploads/uploads.entity';
+import { ResourceVisibility } from './resource-visibility.enum';
 
 import {
   Entity,
@@ -23,6 +24,7 @@ export class Resource {
   @Column()
   description: string;
 
+  // RELATIONS
   @ManyToOne(() => Category, (category) => category.resources)
   category: Category;
 
@@ -32,24 +34,29 @@ export class Resource {
   @ManyToOne(() => Profile, (profile) => profile.resources)
   uploader: Profile;
 
-  // ✅ VISIBILITY CONTROL
-  @Column({ default: 'school' })
-  visibility: 'public' | 'school' | 'restricted';
+  // VISIBILITY CONTROL
+  @Column({
+    type: 'enum',
+    enum: ResourceVisibility,
+    default: ResourceVisibility.SCHOOL,
+  })
+  visibility: ResourceVisibility;
 
-  // Optional fine-grained control
-  @Column({ nullable: true })
-  allowedRoles: string;
+  // RBAC (FIXED: structured instead of raw strings)
+  @Column({ type: 'json', nullable: true })
+  allowedRoles?: string[];
 
-  @Column({ nullable: true })
-  allowedUserIds: string;
+  @Column({ type: 'json', nullable: true })
+  allowedUserIds?: string[];
 
-  // ✅ SYSTEM FIELDS
+  // SYSTEM FIELDS
   @Column({ default: 0 })
   downloadCount: number;
 
   @Column({ default: true })
   isActive: boolean;
 
+  // RELATIONS
   @OneToMany(() => Quiz, (quiz) => quiz.resource)
   quizzes: Quiz[];
 

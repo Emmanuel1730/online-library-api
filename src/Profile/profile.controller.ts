@@ -4,42 +4,49 @@ import {
   Post,
   Body,
   UseGuards,
-  Request,
+  Req,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport'; // Built-in NestJS JWT Guard
 
-// --- PROFILES IMPORTS (Same Folder) ---
+// ✅ Use your custom guard (cleaner + reusable)
+
+// --- PROFILES IMPORTS ---
 import { ProfileService } from './profile.service';
 import { CreateProfileDto } from './create-profile.dto';
-import { Role } from 'src/Auth/role.enum';
-// --- AUTH IMPORTS (Cross Folder) ---
-// Notice the capital 'A' to match your folder structure exactly!
+
+// --- AUTH IMPORTS ---
 import { RolesGuard } from '../Auth/roles.guard';
 import { Roles } from '../Auth/roles.decorator';
+import { Role } from '../Auth/role.enum';
+import { JwtAuthGuard } from 'src/Auth/jwt-auth-guard';
 
-@UseGuards(AuthGuard('jwt'), RolesGuard) // Checks token FIRST, then checks Role
 @Controller('api/profiles')
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
 
-  @Roles(Role.ADMIN)
-  @Get()
-  getAllProfiles() {
-    return this.profileService.getAllProfiles();
-  }
-  // 1. Route to create a new user
+  // 🔓 PUBLIC ROUTE (NO GUARDS)
   @Post()
   createProfile(@Body() profileData: CreateProfileDto) {
     return this.profileService.createProfile(profileData);
   }
 
-  // 2. Route to see YOUR OWN profile
-
-  @Get('me')
-  async getMyprofile(@Request() req) {
-    const userId = req.user.id;
-    return this.profileService.getProfileWithRequests(userId);
+  // 🔒 PROTECTED: ONLY ADMIN
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Get()
+  getAllProfiles() {
+    return this.profileService.getAllProfiles();
   }
 
-  // 3. Route to see ALL users (ONLY Admins)
+  // 🔒 PROTECTED: ANY AUTHENTICATED USER
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  async getMyProfile(@Req() req: any) {
+    if (!req.user) {
+      throw new Error('User not found in request');
+    }
+
+    const userId = req.user.id;
+
+    return this.profileService.getProfileWithRequests(userId);
+  }
 }
