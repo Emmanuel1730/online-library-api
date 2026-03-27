@@ -1,5 +1,5 @@
 export enum Role {
-  ADMIN = 'admin', // The Librarian / Head of IT
-  TEACHER = 'teacher', // Can request resources for classes
-  STUDENT = 'student', // Can request books for study
+  ADMIN = 'ADMIN', // The Librarian / Head of IT
+  TEACHER = 'TEACHER', // Can request resources for classes
+  STUDENT = 'STUDENT', // Can request books for study
 }

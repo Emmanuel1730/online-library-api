@@ -1,5 +1,7 @@
 import {
   Injectable,
+  Inject,
+  forwardRef,
   UnauthorizedException,
   ConflictException,
   NotFoundException,
@@ -11,6 +13,7 @@ import * as crypto from 'crypto';
 @Injectable()
 export class AuthService {
   constructor(
+    @Inject(forwardRef(() => ProfileService))
     private profileService: ProfileService,
     private jwtService: JwtService,
   ) {}
@@ -98,7 +101,7 @@ export class AuthService {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         expiresIn: '15m',
-        secret: process.env.JWT_SECRET || 'your-secret-key',
+        secret: process.env.JWT_SECRET || 'MY_SUPER_SECRET_KEY_123', // Use your standard secret
       }),
       this.jwtService.signAsync(payload, {
         expiresIn: '7d',

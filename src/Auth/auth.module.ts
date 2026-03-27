@@ -1,19 +1,31 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
+import { ConfigModule, ConfigService } from '@nestjs/config'; // Add these
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
-import { ProfileModule } from '../Profile/profile.module'; // To check the DB for users
+import { ProfileModule } from '../Profile/profile.module';
+import { JwtStrategy } from './jwt.strategy';
 
 @Module({
   imports: [
-    ProfileModule, // We need to read profiles to see if the user exists
-    JwtModule.register({
-      global: true,
-      secret: 'MY_SUPER_SECRET_KEY_123', // In production, this goes in a .env file!
-      signOptions: { expiresIn: '1h' }, // Token expires in 1 hour
+    forwardRef(() => ProfileModule),
+    // 1. Ensure PassportModule is imported here
+    PassportModule.register({ defaultStrategy: 'jwt' }),
+
+    // 2. Use registerAsync to ensure .env is loaded first
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+        signOptions: { expiresIn: '1h' },
+      }),
     }),
   ],
-  providers: [AuthService],
+  providers: [AuthService, JwtStrategy],
   controllers: [AuthController],
+  // 3. Now it is safe to export these
+  exports: [AuthService, PassportModule, JwtStrategy],
 })
 export class AuthModule {}
