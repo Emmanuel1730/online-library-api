@@ -10,6 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ProfileService } from '../Profile/profile.service';
 import * as crypto from 'crypto';
 import { UserRole } from '../Profile/profile.entity';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
@@ -19,10 +20,20 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
+  // LOGIN FIXED
   async login(email: string, pass: string) {
     const user = await this.profileService.findByEmail(email);
 
-    if (!user || user.password !== pass) {
+    if (!user) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    const isValid = await this.profileService.validatePassword(
+      pass,
+      user.password,
+    );
+
+    if (!isValid) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -49,15 +60,14 @@ export class AuthService {
     };
   }
 
+  // REGISTER (already safe because service hashes password)
   async register(signUpDto: any) {
     const userExists = await this.profileService.findByEmail(
       signUpDto.email,
     );
 
     if (userExists) {
-      throw new ConflictException(
-        'User with this email already exists',
-      );
+      throw new ConflictException('User already exists');
     }
 
     const savedUser =
@@ -66,9 +76,7 @@ export class AuthService {
     const schoolId: string | null = savedUser.school?.id ?? null;
 
     if (savedUser.role !== UserRole.ADMIN && !schoolId) {
-      throw new UnauthorizedException(
-        'User must belong to a school',
-      );
+      throw new UnauthorizedException('User must belong to a school');
     }
 
     const tokens = await this.generateTokens(
@@ -100,9 +108,7 @@ export class AuthService {
       role,
     };
 
-    if (schoolId) {
-      payload.schoolId = schoolId;
-    }
+    if (schoolId) payload.schoolId = schoolId;
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
@@ -133,10 +139,6 @@ export class AuthService {
 
     const schoolId: string | null = user.school?.id ?? null;
 
-    if (user.role !== UserRole.ADMIN && !schoolId) {
-      throw new UnauthorizedException('User has no school');
-    }
-
     return this.generateTokens(
       user.id,
       user.email,
@@ -157,9 +159,7 @@ export class AuthService {
     const user = await this.profileService.findByEmail(email);
 
     if (!user) {
-      throw new NotFoundException(
-        'No account found with that email',
-      );
+      throw new NotFoundException('No account found');
     }
 
     const resetToken = crypto.randomBytes(20).toString('hex');
@@ -173,29 +173,30 @@ export class AuthService {
     });
 
     return {
-      message: 'Reset token generated successfully',
+      message: 'Reset token generated',
       resetToken,
     };
   }
 
+  // FIXED RESET PASSWORD (hashed)
   async resetPassword(token: string, newPassword: string) {
     const user =
       await this.profileService.findByResetToken(token);
 
     if (!user) {
-      throw new UnauthorizedException(
-        'Reset token is invalid or has expired',
-      );
+      throw new UnauthorizedException('Invalid or expired token');
     }
 
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
     await this.profileService.updateProfile(user.id, {
-      password: newPassword,
+      password: hashedPassword,
       resetPasswordToken: null,
       resetPasswordExpires: null,
     });
 
     return {
-      message: 'Password has been reset successfully',
+      message: 'Password reset successful',
     };
   }
 }

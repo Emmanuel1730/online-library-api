@@ -9,6 +9,7 @@ import {
 import { Request } from '../Requests/request.entity';
 import { Resource } from '../resources/resources.entity';
 import { School } from '../school/school.entity';
+import { Exclude } from 'class-transformer';
 
 export enum UserRole {
   STUDENT = 'STUDENT',
@@ -36,6 +37,7 @@ export class Profile {
   @Column({ unique: true })
   email: string;
 
+  @Exclude()
   @Column()
   password: string;
 
