@@ -1,6 +1,13 @@
-// uploads/upload.entity.ts
+// src/uploads/uploads.entity.ts
+
 import { Resource } from 'src/resources/resources.entity';
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 
 @Entity()
 export class Upload {
@@ -13,6 +20,9 @@ export class Upload {
   @Column()
   fileType: string;
 
-  @ManyToOne(() => Resource, { nullable: true })
-  resource: Resource;
+  @ManyToOne(() => Resource, (resource) => resource.uploads, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'resourceId' })
+  resource?: Resource;
 }

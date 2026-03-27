@@ -1,4 +1,40 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Upload } from './uploads.entity';
+import { SupabaseService } from 'src/supabase/supabase.service';
+import { CreateUploadDto } from './create-upload.dto';
 
 @Injectable()
-export class UploadsService {}
+export class UploadsService {
+  constructor(
+    @InjectRepository(Upload)
+    private uploadRepo: Repository<Upload>,
+    private supabaseService: SupabaseService,
+  ) {}
+
+  async create(file: Express.Multer.File, dto: CreateUploadDto) {
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+
+    // 1. Upload to Supabase
+    const fileUrl = await this.supabaseService.uploadFile(file);
+
+    // 2. Save to DB
+    const upload = this.uploadRepo.create({
+      fileUrl,
+      fileType: file.mimetype,
+    });
+
+    const saved = await this.uploadRepo.save(upload);
+
+    // 3. Return structured response
+    return {
+      id: saved.id,
+      fileUrl: saved.fileUrl,
+      fileType: saved.fileType,
+      ...dto,
+    };
+  }
+}

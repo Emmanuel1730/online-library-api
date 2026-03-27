@@ -1,9 +1,7 @@
-// schools/school.entity.ts
 import { Category } from 'src/categories/categories.entity';
+import { Profile } from 'src/Profile/profile.entity';
 import { Resource } from 'src/resources/resources.entity';
-import { User } from 'src/users/users.entity';
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
-
 
 @Entity()
 export class School {
@@ -16,8 +14,12 @@ export class School {
   @Column({ nullable: true })
   location: string;
 
-  @OneToMany(() => User, (user) => user.school)
-  users: User[];
+  // ✅ UPLOAD CONTROL
+  @Column({ default: false })
+  teachersCanUpload: boolean;
+
+  @OneToMany(() => Profile, (profile) => profile.school)
+  profiles: Profile[];
 
   @OneToMany(() => Resource, (resource) => resource.school)
   resources: Resource[];

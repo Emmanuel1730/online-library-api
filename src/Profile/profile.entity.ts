@@ -4,8 +4,11 @@ import {
   Column,
   CreateDateColumn,
   OneToMany,
+  ManyToOne,
 } from 'typeorm';
 import { Request } from '../Requests/request.entity';
+import { Resource } from '../resources/resources.entity';
+import { School } from '../school/school.entity';
 
 export enum UserRole {
   STUDENT = 'STUDENT',
@@ -39,7 +42,7 @@ export class Profile {
   @Column({
     type: 'enum',
     enum: UserRole,
-    default: UserRole.STUDENT, // Most users will be students
+    default: UserRole.STUDENT,
   })
   role: UserRole;
 
@@ -54,6 +57,14 @@ export class Profile {
 
   @OneToMany(() => Request, (request) => request.user)
   requests: Request[];
+
+  // Each user belongs to a school
+  @ManyToOne(() => School, (school) => school.profiles)
+  school: School;
+
+  // A user can upload many resources
+  @OneToMany(() => Resource, (resource) => resource.uploader)
+  resources: Resource[];
 
   @Column({ type: 'varchar', nullable: true })
   refreshToken: string | null;

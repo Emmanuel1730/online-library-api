@@ -3,27 +3,30 @@ import {
   Post,
   Get,
   Body,
-  UploadedFile,
   UseInterceptors,
+  UploadedFile,
+  Req,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ResourcesService } from './resources.service';
+import { CreateResourceWithFileDto } from './create-resource-with-file.dto';
 
 @Controller('resources')
 export class ResourcesController {
   constructor(private readonly service: ResourcesService) {}
 
-  @Post()
-  @UseInterceptors(FileInterceptor('file')) // 👈 key
-  create(
+  @Post('create-with-file')
+  @UseInterceptors(FileInterceptor('file'))
+  createWithFile(
     @UploadedFile() file: Express.Multer.File,
-    @Body() body: any,
+    @Body() body: CreateResourceWithFileDto,
+    @Req() req: any,
   ) {
-    return this.service.create(body, file);
+    return this.service.createWithFile(file, body, req.user);
   }
 
   @Get()
-  findAll() {
-    return this.service.findAll();
+  findAll(@Req() req: any) {
+    return this.service.findAll(req.user);
   }
 }

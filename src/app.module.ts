@@ -7,6 +7,18 @@ import { SettingsModule } from './Settings/settings.module';
 import { ProfileModule } from './Profile/profile.module';
 import { Profile } from './Profile/profile.entity';
 import { AuthModule } from './Auth/auth.module';
+import { Resource } from './resources/resources.entity';
+import { School } from './school/school.entity';
+import { Category } from './categories/categories.entity';
+import { Upload } from './uploads/uploads.entity';
+import { SupabaseService } from './supabase/supabase.service';
+import { SupabaseModule } from './supabase/supabase.module';
+import { Quiz } from './quizzes/quizzes.entity';
+import { SchoolModule } from './school/school.module';
+import { ResourcesModule } from './resources/resources.module';
+import { CategoriesModule } from './categories/categories.module';
+import { QuizzesModule } from './quizzes/quizzes.module';
+import { UploadsModule } from './uploads/uploads.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -18,7 +30,7 @@ import { AuthModule } from './Auth/auth.module';
       username: process.env.DB_USER,
       password: process.env.DB_PASS,
       database: process.env.DB_NAME,
-      entities: [Request, Settings, Profile], //Reg entities
+      entities: [Request, Settings, Profile, Resource, School, Category,Upload, Quiz], //Reg entities
       autoLoadEntities: true,
       synchronize: true,
     }),
@@ -26,8 +38,14 @@ import { AuthModule } from './Auth/auth.module';
     SettingsModule,
     ProfileModule,
     AuthModule,
+    SupabaseModule,
+    SchoolModule,
+    ResourcesModule,
+    CategoriesModule,
+    QuizzesModule,
+    UploadsModule,
   ],
   controllers: [],
-  providers: [FirebaseService],
+  providers: [SupabaseService],
 })
 export class AppModule {}
