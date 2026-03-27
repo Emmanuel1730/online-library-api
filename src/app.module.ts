@@ -7,6 +7,7 @@ import { SettingsModule } from './Settings/settings.module';
 import { ProfileModule } from './Profile/profile.module';
 import { Profile } from './Profile/profile.entity';
 import { AuthModule } from './Auth/auth.module';
+import { PaymentModule } from './payment/payment.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -27,6 +28,7 @@ import { AuthModule } from './Auth/auth.module';
     SettingsModule,
     ProfileModule,
     AuthModule,
+    PaymentModule,
   ],
   controllers: [],
   providers: [],
