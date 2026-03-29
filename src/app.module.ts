@@ -19,6 +19,7 @@ import { ResourcesModule } from './resources/resources.module';
 import { CategoriesModule } from './categories/categories.module';
 import { QuizzesModule } from './quizzes/quizzes.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { PaymentModule } from './payment/payment.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -44,6 +45,7 @@ import { UploadsModule } from './uploads/uploads.module';
     CategoriesModule,
     QuizzesModule,
     UploadsModule,
+    PaymentModule,
   ],
   controllers: [],
   providers: [SupabaseService],
