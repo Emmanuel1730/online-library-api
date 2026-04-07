@@ -12,7 +12,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Role } from 'src/Auth/role.enum';
 import { RolesGuard } from 'src/Auth/roles.guard';
 import { Roles } from 'src/Auth/roles.decorator';
-@Controller('api/payment')
+@Controller('payment')
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 

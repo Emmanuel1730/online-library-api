@@ -19,7 +19,7 @@ import { Roles } from '../Auth/roles.decorator';
 import { Role } from '../Auth/role.enum';
 import { JwtAuthGuard } from 'src/Auth/jwt-auth-guard';
 
-@Controller('api/profiles')
+@Controller('profiles')
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
 

@@ -20,6 +20,17 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
+  private formatUser(user: any) {
+    return {
+      id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      role: user.role,
+      schoolId: user.school?.id ?? null
+    }
+  }
+
   // LOGIN FIXED
   async login(email: string, pass: string) {
     const user = await this.profileService.findByEmail(email);
@@ -51,12 +62,13 @@ export class AuthService {
     );
 
     await this.profileService.updateProfile(user.id, {
-      refreshToken: tokens.refresh_token,
+      refreshToken: tokens.refreshToken,
     });
 
     return {
-      ...tokens,
-      user,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user: this.formatUser(user),
     };
   }
 
@@ -87,12 +99,13 @@ export class AuthService {
     );
 
     await this.profileService.updateProfile(savedUser.id, {
-      refreshToken: tokens.refresh_token,
+      refreshToken: tokens.refreshToken,
     });
 
     return {
-      ...tokens,
-      user: savedUser,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user: this.formatUser(savedUser),
     };
   }
 
@@ -124,28 +137,40 @@ export class AuthService {
     ]);
 
     return {
-      access_token: accessToken,
-      refresh_token: refreshToken,
+      accessToken,
+      refreshToken,
     };
   }
 
   async refreshToken(userId: number, refreshToken: string) {
-    const user =
-      await this.profileService.getProfileWithRequests(userId);
+  const user =
+    await this.profileService.getProfileWithRequests(userId);
 
-    if (!user || user.refreshToken !== refreshToken) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    const schoolId: string | null = user.school?.id ?? null;
-
-    return this.generateTokens(
-      user.id,
-      user.email,
-      user.role,
-      schoolId,
-    );
+  if (!user || user.refreshToken !== refreshToken) {
+    throw new UnauthorizedException('Invalid refresh token');
   }
+
+  const schoolId: string | null = user.school?.id ?? null;
+
+  // ✅ generate new tokens
+  const tokens = await this.generateTokens(
+    user.id,
+    user.email,
+    user.role,
+    schoolId,
+  );
+
+  // ✅ store NEW refresh token (rotation)
+  await this.profileService.updateProfile(user.id, {
+    refreshToken: tokens.refreshToken,
+  });
+
+  // ✅ return new tokens
+  return {
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+  };
+}
 
   async logout(userId: number) {
     await this.profileService.updateProfile(userId, {

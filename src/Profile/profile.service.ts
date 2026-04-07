@@ -45,10 +45,10 @@ export class ProfileService {
 
   // 2. Get all library members
   getAllProfiles() {
-    return this.profileRepository.find({
-      relations: ['school'],
-    });
-  }
+  return this.profileRepository.find({
+    relations: ['school', 'resources'],
+  })
+}
 
   // 3. Find user by email (USED IN AUTH)
   async findByEmail(email: string): Promise<Profile | null> {

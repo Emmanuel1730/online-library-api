@@ -20,10 +20,12 @@ import { CategoriesModule } from './categories/categories.module';
 import { QuizzesModule } from './quizzes/quizzes.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { PaymentModule } from './payment/payment.module';
+import { SchoolClass } from './classes/classes.entity';
+import { ClassesModule } from './classes/classes.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST,
@@ -31,9 +33,13 @@ import { PaymentModule } from './payment/payment.module';
       username: process.env.DB_USER,
       password: process.env.DB_PASS,
       database: process.env.DB_NAME,
-      entities: [Request, Settings, Profile, Resource, School, Category,Upload, Quiz], //Reg entities
+      entities: [Request, Settings, Profile, Resource, School, Category, Upload, Quiz, SchoolClass],
       autoLoadEntities: true,
       synchronize: true,
+      extra: {
+        max: 10,          // max connections in pool
+        idleTimeoutMillis: 30000,
+      },
     }),
     RequestModule,
     SettingsModule,
@@ -46,6 +52,7 @@ import { PaymentModule } from './payment/payment.module';
     QuizzesModule,
     UploadsModule,
     PaymentModule,
+    ClassesModule,
   ],
   controllers: [],
   providers: [SupabaseService],

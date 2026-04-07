@@ -1,17 +1,45 @@
-import { Category } from 'src/categories/categories.entity';
-import { Profile } from 'src/Profile/profile.entity';
-import { Quiz } from 'src/quizzes/quizzes.entity';
-import { School } from 'src/school/school.entity';
-import { Upload } from 'src/uploads/uploads.entity';
-import { ResourceVisibility } from './resource-visibility.enum';
-
 import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
   OneToMany,
+  CreateDateColumn,
+  UpdateDateColumn,
+  JoinColumn,
 } from 'typeorm';
+
+import { School } from '../school/school.entity';
+import { Category } from 'src/categories/categories.entity';
+import { SchoolClass } from 'src/classes/classes.entity';
+import { Profile } from 'src/Profile/profile.entity';
+import { Upload } from 'src/uploads/uploads.entity';
+import { Quiz } from 'src/quizzes/quizzes.entity';
+
+export enum ResourceType {
+  PDF = 'PDF',
+  VIDEO = 'VIDEO',
+  AUDIO = 'AUDIO',
+  IMAGE = 'IMAGE',
+  LINK = 'LINK',
+}
+
+export enum ResourceStatus {
+  DRAFT = 'DRAFT',
+  PUBLISHED = 'PUBLISHED',
+}
+
+export enum ResourceForm {
+  DOCUMENT = 'DOCUMENT',
+  VIDEO = 'VIDEO',
+  AUDIO = 'AUDIO',
+  OTHER = 'OTHER',
+}
+
+export enum ResourceVisibility {
+  PUBLIC = 'PUBLIC',
+  PRIVATE = 'PRIVATE',
+}
 
 @Entity()
 export class Resource {
@@ -21,47 +49,64 @@ export class Resource {
   @Column()
   title: string;
 
-  @Column()
+  @Column('text')
   description: string;
 
-  // RELATIONS
-  @ManyToOne(() => Category, (category) => category.resources)
-  category: Category;
+  @Column({ type: 'enum', enum: ResourceType })
+  type: ResourceType;
 
-  @ManyToOne(() => School, (school) => school.resources)
-  school: School;
+  @Column({ type: 'enum', enum: ResourceForm, nullable: true })
+  form: ResourceForm;
 
-  @ManyToOne(() => Profile, (profile) => profile.resources)
-  uploader: Profile;
+  @Column({ type: 'enum', enum: ResourceStatus, default: ResourceStatus.DRAFT })
+  status: ResourceStatus;
 
-  // VISIBILITY CONTROL
+  @Column({ nullable: true })
+  targetAudience: string;
+
   @Column({
     type: 'enum',
     enum: ResourceVisibility,
-    default: ResourceVisibility.SCHOOL,
+    default: ResourceVisibility.PUBLIC,
   })
   visibility: ResourceVisibility;
 
-  // RBAC (FIXED: structured instead of raw strings)
-  @Column({ type: 'json', nullable: true })
-  allowedRoles?: string[];
+  @Column()
+  fileUrl: string;
 
-  @Column({ type: 'json', nullable: true })
-  allowedUserIds?: string[];
-
-  // SYSTEM FIELDS
   @Column({ default: 0 })
   downloadCount: number;
 
   @Column({ default: true })
   isActive: boolean;
 
-  // RELATIONS
+  // --- Relations ---
+
+  @ManyToOne(() => Category, { nullable: true })
+  category: Category;
+
+  @ManyToOne(() => SchoolClass, { nullable: true })
+  targetClass: SchoolClass;
+
+  @ManyToOne(() => School, (school) => school.resources, { nullable: true })
+  school: School;
+
+  @Column({ nullable: true })
+  uploaderId: string;
+
+  @ManyToOne(() => Profile, (profile) => profile.resources, { nullable: true })
+  @JoinColumn({ name: 'uploaderId', referencedColumnName: 'id' })
+  uploader: Profile;
+
+  @OneToMany(() => Upload, (upload) => upload.resource)
+  uploads: Upload[];
+
   @OneToMany(() => Quiz, (quiz) => quiz.resource)
   quizzes: Quiz[];
 
-  @OneToMany(() => Upload, (upload) => upload.resource, {
-    cascade: true,
-  })
-  uploads: Upload[];
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }

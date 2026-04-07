@@ -1,14 +1,14 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Category } from './categories.entity';
+import { SchoolClass } from './classes.entity';
 import { Repository } from 'typeorm';
 import { UserRole } from 'src/Profile/profile.entity';
 
 @Injectable()
-export class CategoriesService {
+export class ClassesService {
   constructor(
-    @InjectRepository(Category)
-    private repo: Repository<Category>,
+    @InjectRepository(SchoolClass)
+    private repo: Repository<SchoolClass>,
   ) {}
 
   async create(dto: any, user: any) {
@@ -20,22 +20,22 @@ export class CategoriesService {
       throw new BadRequestException('schoolId is required');
     }
 
-    const category = this.repo.create({
+    const schoolClass = this.repo.create({
       name: dto.name,
       school: { id: schoolId },
     });
 
-    return this.repo.save(category);
+    return this.repo.save(schoolClass);
   }
 
   async findAll(user: any) {
-    // Admins with no schoolId get all categories; otherwise filter by school
+    // Admins with no schoolId get all classes; otherwise filter by school
     const schoolId =
       user.role === UserRole.ADMIN ? user.schoolId ?? undefined : user.schoolId;
 
     return this.repo.find({
       where: schoolId ? { school: { id: schoolId } } : {},
-      relations: ['school', 'resources'],
+      relations: ['school'],
     });
   }
 }

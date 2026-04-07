@@ -2,6 +2,7 @@ import {
   Injectable,
   BadRequestException,
   ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -36,16 +37,11 @@ export class ResourcesService {
   ) {
     if (!file) throw new BadRequestException('File required');
 
-    // RBAC
     if (user.role === UserRole.STUDENT) {
       throw new ForbiddenException('Students cannot upload');
     }
 
     const schoolId = user.schoolId;
-
-    if (user.role !== UserRole.ADMIN && !schoolId) {
-      throw new ForbiddenException('Missing school context');
-    }
 
     const school = schoolId
       ? await this.schoolRepo.findOne({ where: { id: schoolId } })
@@ -55,21 +51,32 @@ export class ResourcesService {
       throw new BadRequestException('Invalid school');
     }
 
+    // 1. Upload file to storage
     const fileUrl = await this.supabaseService.uploadFile(file);
 
+    // 2. Create and save resource
     const resource = this.resourceRepo.create({
       title: dto.title,
       description: dto.description,
+      type: dto.type,
+      form: dto.form,
+      status: dto.status,
+      targetAudience: dto.targetAudience,
       visibility: dto.visibility,
-      category: { id: dto.categoryId } as any,
+      fileUrl,
+      isActive: true,
+      category: dto.categoryId ? ({ id: dto.categoryId } as any) : null,
       school: schoolId ? ({ id: schoolId } as any) : null,
+      uploaderId: String(user.id),
       uploader: { id: user.id } as any,
     });
 
     const savedResource = await this.resourceRepo.save(resource);
 
+    // 3. Create upload record linked to the saved resource
     const upload = this.uploadRepo.create({
       fileUrl,
+      filePath: fileUrl,
       fileType: file.mimetype,
       uploaderId: String(user.id),
       schoolId: String(user.schoolId),
@@ -85,14 +92,6 @@ export class ResourcesService {
   }
 
   async findAll(user: JwtUser, query: any) {
-    const page = Number(query.page ?? 1);
-    const limit = Number(query.limit ?? 10);
-    const skip = (page - 1) * limit;
-
-    const search = query.search ?? '';
-    const categoryId = query.categoryId;
-    const visibility = query.visibility;
-
     const qb = this.resourceRepo
       .createQueryBuilder('resource')
       .leftJoinAndSelect('resource.category', 'category')
@@ -101,42 +100,15 @@ export class ResourcesService {
       .leftJoinAndSelect('resource.uploads', 'uploads')
       .where('resource.isActive = true');
 
-    // SCHOOL ISOLATION
     if (user.role !== UserRole.ADMIN && user.schoolId) {
       qb.andWhere('school.id = :schoolId', {
         schoolId: user.schoolId,
       });
     }
 
-    if (search) {
-      qb.andWhere(
-        '(resource.title ILIKE :search OR resource.description ILIKE :search)',
-        { search: `%${search}%` },
-      );
-    }
-
-    if (categoryId) {
-      qb.andWhere('category.id = :categoryId', { categoryId });
-    }
-
-    if (visibility) {
-      qb.andWhere('resource.visibility = :visibility', {
-        visibility,
-      });
-    }
-
-    qb.skip(skip).take(limit);
-
     const [data, total] = await qb.getManyAndCount();
 
-    return {
-      data,
-      meta: {
-        total,
-        page,
-        lastPage: Math.ceil(total / limit),
-      },
-    };
+    return { data, total };
   }
 
   async incrementDownload(resourceId: string) {
@@ -147,5 +119,28 @@ export class ResourcesService {
     );
 
     return { message: 'Download tracked' };
+  }
+
+  async remove(id: string, user: JwtUser) {
+    const resource = await this.resourceRepo.findOne({
+      where: { id },
+      relations: ['uploads', 'school', 'uploader'],
+    });
+
+    if (!resource) {
+      throw new NotFoundException('Resource not found');
+    }
+
+    const isAdmin = user.role === UserRole.ADMIN;
+    const isOwner = resource.uploader?.id === user.id;
+
+    if (!isAdmin && !isOwner) {
+      throw new ForbiddenException('Not allowed');
+    }
+
+    await this.uploadRepo.delete({ resource: { id } as any });
+    await this.resourceRepo.delete(id);
+
+    return { message: 'Deleted', id };
   }
 }

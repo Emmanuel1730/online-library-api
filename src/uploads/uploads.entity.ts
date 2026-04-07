@@ -15,6 +15,9 @@ export class Upload {
   @Column()
   fileUrl: string;
 
+  @Column({ nullable: true })
+  filePath: string;
+
   @Column()
   fileType: string;
 

@@ -1,5 +1,5 @@
-import { IsString, IsEnum, IsUUID } from 'class-validator';
-import { ResourceVisibility } from './resource-visibility.enum';
+import { IsString, IsEnum, IsUUID, IsOptional } from 'class-validator';
+import { ResourceStatus, ResourceType, ResourceForm, ResourceVisibility } from './resources.entity';
 
 export class CreateResourceWithFileDto {
   @IsString()
@@ -8,9 +8,34 @@ export class CreateResourceWithFileDto {
   @IsString()
   description: string;
 
-  @IsUUID()
-  categoryId: string;
+  @IsEnum(ResourceType)
+  type: ResourceType;
 
+  @IsOptional()
+  @IsEnum(ResourceForm)
+  form?: ResourceForm;
+
+  @IsOptional()
+  @IsEnum(ResourceStatus)
+  status?: ResourceStatus;
+
+  @IsOptional()
+  @IsString()
+  targetAudience?: string;
+
+  @IsOptional()
   @IsEnum(ResourceVisibility)
-  visibility: ResourceVisibility;
+  visibility?: ResourceVisibility;
+
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  classId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  schoolId?: string;
 }

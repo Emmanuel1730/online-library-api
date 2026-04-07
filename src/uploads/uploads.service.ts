@@ -22,8 +22,11 @@ export class UploadsService {
 
     const upload = this.uploadRepo.create({
       fileUrl,
+      filePath: fileUrl,
       fileType: file.mimetype,
       resource: dto.resourceId ? ({ id: dto.resourceId } as any) : null,
+      schoolId: dto.schoolId,
+      uploaderId: dto.uploaderId,
     });
 
     return this.uploadRepo.save(upload);

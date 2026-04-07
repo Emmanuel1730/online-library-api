@@ -3,7 +3,7 @@ import { SettingsService } from './settings.service';
 import { Settings } from './settings.entity';
 import { RolesGuard } from '../Auth/roles.guard'; // <-- Import the guard
 
-@Controller('api/settings')
+@Controller('settings')
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 

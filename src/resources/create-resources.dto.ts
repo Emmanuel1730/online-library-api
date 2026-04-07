@@ -1,4 +1,11 @@
-import { IsString, IsUUID, IsEnum } from 'class-validator';
+import {
+  IsEnum,
+  IsString,
+  IsUUID,
+  IsOptional,
+} from 'class-validator';
+
+import { ResourceType, ResourceStatus, ResourceForm, ResourceVisibility } from './resources.entity';
 
 export class CreateResourceDto {
   @IsString()
@@ -7,12 +14,34 @@ export class CreateResourceDto {
   @IsString()
   description: string;
 
-  @IsUUID()
-  schoolId: string;
+  @IsEnum(ResourceType)
+  type: ResourceType;
 
-  @IsUUID()
-  categoryId: string;
+  @IsOptional()
+  @IsEnum(ResourceForm)
+  form?: ResourceForm;
 
-  @IsEnum(['public', 'school', 'restricted'])
-  visibility: 'public' | 'school' | 'restricted';
+  @IsOptional()
+  @IsEnum(ResourceStatus)
+  status?: ResourceStatus;
+
+  @IsOptional()
+  @IsString()
+  targetAudience?: string;
+
+  @IsOptional()
+  @IsEnum(ResourceVisibility)
+  visibility?: ResourceVisibility;
+
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  classId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  schoolId?: string;
 }

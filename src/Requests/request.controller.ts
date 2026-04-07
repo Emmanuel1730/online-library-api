@@ -15,7 +15,7 @@ import { RolesGuard } from '../Auth/roles.guard';
 import { Roles } from '../Auth/roles.decorator'; // You'll need this simple decorator
 import { Role } from '../Auth/role.enum';
 
-@Controller('api/request')
+@Controller('request')
 @UseGuards(RolesGuard) // Apply the bouncer to the whole controller
 export class RequestsController {
   constructor(private readonly requestsService: RequestService) {}
