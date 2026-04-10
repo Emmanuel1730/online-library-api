@@ -5,7 +5,6 @@ import { Roles } from 'src/Auth/roles.decorator';
 import { RolesGuard } from 'src/Auth/roles.guard';
 import { Role } from 'src/Auth/role.enum';
 
-@UseGuards(JwtAuthGuard)
 @Controller('school')
 export class SchoolController {
   constructor(private service: SchoolService) {}

@@ -31,8 +31,8 @@ export class Profile {
   @Column({ nullable: true })
   bio: string;
 
-  @Column({ nullable: true })
-  age: number;
+  @Column({ type: 'date', nullable: true })
+  dateOfBirth: Date;
 
   @Column({ unique: true })
   email: string;
@@ -60,11 +60,9 @@ export class Profile {
   @OneToMany(() => Request, (request) => request.user)
   requests: Request[];
 
-  // Each user belongs to a school
   @ManyToOne(() => School, (school) => school.profiles)
   school: School;
 
-  // A user can upload many resources
   @OneToMany(() => Resource, (resource) => resource.uploader)
   resources: Resource[];
 

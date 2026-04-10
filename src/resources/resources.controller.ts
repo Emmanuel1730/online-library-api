@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Body,
   UseInterceptors,
   UploadedFile,
@@ -30,11 +31,17 @@ export class ResourcesController {
     @Body() body: CreateResourceWithFileDto,
     @Req() req: { user: JwtUser },
   ) {
-    if (!file) {
-      throw new BadRequestException('File is required');
-    }
-
+    if (!file) throw new BadRequestException('File is required');
     return this.service.createWithFile(file, body, req.user);
+  }
+
+  @Patch(':id')
+  async update(
+    @Param('id') id: string,
+    @Body() body: Partial<CreateResourceWithFileDto>,
+    @Req() req: { user: JwtUser },
+  ) {
+    return this.service.update(id, body, req.user);
   }
 
   @Post(':id/download')

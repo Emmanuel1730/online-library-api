@@ -51,10 +51,8 @@ export class ResourcesService {
       throw new BadRequestException('Invalid school');
     }
 
-    // 1. Upload file to storage
     const fileUrl = await this.supabaseService.uploadFile(file);
 
-    // 2. Create and save resource
     const resource = this.resourceRepo.create({
       title: dto.title,
       description: dto.description,
@@ -66,6 +64,7 @@ export class ResourcesService {
       fileUrl,
       isActive: true,
       category: dto.categoryId ? ({ id: dto.categoryId } as any) : null,
+      targetClass: dto.classId ? ({ id: dto.classId } as any) : null,
       school: schoolId ? ({ id: schoolId } as any) : null,
       uploaderId: String(user.id),
       uploader: { id: user.id } as any,
@@ -73,7 +72,6 @@ export class ResourcesService {
 
     const savedResource = await this.resourceRepo.save(resource);
 
-    // 3. Create upload record linked to the saved resource
     const upload = this.uploadRepo.create({
       fileUrl,
       filePath: fileUrl,
@@ -98,12 +96,16 @@ export class ResourcesService {
       .leftJoinAndSelect('resource.school', 'school')
       .leftJoinAndSelect('resource.uploader', 'uploader')
       .leftJoinAndSelect('resource.uploads', 'uploads')
+      .leftJoinAndSelect('resource.targetClass', 'targetClass') // ← was missing
       .where('resource.isActive = true');
 
     if (user.role !== UserRole.ADMIN && user.schoolId) {
-      qb.andWhere('school.id = :schoolId', {
-        schoolId: user.schoolId,
-      });
+      // PUBLIC resources are visible to everyone.
+      // PRIVATE resources are restricted to the user's own school.
+      qb.andWhere(
+        '(resource.visibility = :public OR school.id = :schoolId)',
+        { public: 'PUBLIC', schoolId: user.schoolId },
+      );
     }
 
     const [data, total] = await qb.getManyAndCount();
@@ -111,13 +113,41 @@ export class ResourcesService {
     return { data, total };
   }
 
-  async incrementDownload(resourceId: string) {
-    await this.resourceRepo.increment(
-      { id: resourceId },
-      'downloadCount',
-      1,
-    );
+  async update(id: string, dto: Partial<CreateResourceWithFileDto>, user: JwtUser) {
+    const resource = await this.resourceRepo.findOne({
+      where: { id },
+      relations: ['uploader', 'school'],
+    });
 
+    if (!resource) throw new NotFoundException('Resource not found');
+
+    const isAdmin = user.role === UserRole.ADMIN;
+    const isOwner = resource.uploader?.id === user.id;
+
+    if (!isAdmin && !isOwner) {
+      throw new ForbiddenException('Not allowed to edit this resource');
+    }
+
+    await this.resourceRepo.update(id, {
+      ...(dto.title        && { title: dto.title }),
+      ...(dto.description  && { description: dto.description }),
+      ...(dto.type         && { type: dto.type }),
+      ...(dto.form         && { form: dto.form }),
+      ...(dto.status       && { status: dto.status }),
+      ...(dto.targetAudience && { targetAudience: dto.targetAudience }),
+      ...(dto.visibility   && { visibility: dto.visibility }),
+      ...(dto.categoryId   && { category: { id: dto.categoryId } as any }),
+      ...(dto.classId      && { targetClass: { id: dto.classId } as any }),
+    });
+
+    return this.resourceRepo.findOne({
+      where: { id },
+      relations: ['category', 'targetClass', 'school', 'uploader'],
+    });
+  }
+
+  async incrementDownload(resourceId: string) {
+    await this.resourceRepo.increment({ id: resourceId }, 'downloadCount', 1);
     return { message: 'Download tracked' };
   }
 
@@ -127,16 +157,12 @@ export class ResourcesService {
       relations: ['uploads', 'school', 'uploader'],
     });
 
-    if (!resource) {
-      throw new NotFoundException('Resource not found');
-    }
+    if (!resource) throw new NotFoundException('Resource not found');
 
     const isAdmin = user.role === UserRole.ADMIN;
     const isOwner = resource.uploader?.id === user.id;
 
-    if (!isAdmin && !isOwner) {
-      throw new ForbiddenException('Not allowed');
-    }
+    if (!isAdmin && !isOwner) throw new ForbiddenException('Not allowed');
 
     await this.uploadRepo.delete({ resource: { id } as any });
     await this.resourceRepo.delete(id);

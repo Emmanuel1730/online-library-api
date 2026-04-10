@@ -1,6 +1,7 @@
 import { Body, Controller, Post, HttpCode, HttpStatus, UseGuards, Get, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth-guard';
+import { CreateProfileDto } from '../Profile/create-profile.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -11,19 +12,19 @@ export class AuthController {
   signIn(@Body() signInDto: Record<string, any>) {
     return this.authService.login(signInDto.email, signInDto.password);
   }
+
   @Post('register')
-  async register(@Body() signUpDto: any) {
+  async register(@Body() signUpDto: CreateProfileDto) {
     const result = await this.authService.register(signUpDto);
     return result;
   }
+
   @Post('refresh')
   async refreshTokens(@Body() body: any) {
-    // We expect the frontend/Postman to send the user's ID and their Refresh Token in the JSON body
     return this.authService.refreshToken(body.userId, body.refreshToken);
   }
 
   @Post('logout')
-  //@HttpCode(HttpStatus.OK)
   async logout(@Body() body: { userId: number }) {
     return await this.authService.logout(body.userId);
   }
@@ -32,6 +33,7 @@ export class AuthController {
   async forgotPassword(@Body('email') email: string) {
     return await this.authService.forgotPassword(email);
   }
+
   @Post('reset-password')
   async resetPassword(
     @Body('token') token: string,

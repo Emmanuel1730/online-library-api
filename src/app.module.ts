@@ -22,6 +22,8 @@ import { UploadsModule } from './uploads/uploads.module';
 import { PaymentModule } from './payment/payment.module';
 import { SchoolClass } from './classes/classes.entity';
 import { ClassesModule } from './classes/classes.module';
+import { UserActivity } from './activity/user-activity.entity';
+import { ActivityModule } from './activity/activity.module';
 
 @Module({
   imports: [
@@ -33,7 +35,7 @@ import { ClassesModule } from './classes/classes.module';
       username: process.env.DB_USER,
       password: process.env.DB_PASS,
       database: process.env.DB_NAME,
-      entities: [Request, Settings, Profile, Resource, School, Category, Upload, Quiz, SchoolClass],
+      entities: [Request, Settings, Profile, Resource, School, Category, Upload, Quiz, SchoolClass, UserActivity],
       autoLoadEntities: true,
       synchronize: true,
       extra: {
@@ -53,6 +55,7 @@ import { ClassesModule } from './classes/classes.module';
     UploadsModule,
     PaymentModule,
     ClassesModule,
+    ActivityModule,
   ],
   controllers: [],
   providers: [SupabaseService],

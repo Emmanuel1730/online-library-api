@@ -4,7 +4,7 @@ import {
   IsOptional,
   IsEnum,
   IsUUID,
-  IsInt,
+  IsDateString,
 } from 'class-validator';
 import { UserRole } from './profile.entity';
 
@@ -20,8 +20,8 @@ export class CreateProfileDto {
   bio?: string;
 
   @IsOptional()
-  @IsInt()
-  age?: number;
+  @IsDateString()
+  dateOfBirth?: string;
 
   @IsEmail()
   email: string;
@@ -29,7 +29,6 @@ export class CreateProfileDto {
   @IsString()
   password: string;
 
-  // role optional (defaults handled in service if needed)
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
@@ -37,7 +36,6 @@ export class CreateProfileDto {
   @IsString()
   libraryCardNumber: string;
 
-  // 🔴 FIX: optional for ADMIN, required logic moved to service
   @IsOptional()
   @IsUUID()
   schoolId?: string;
