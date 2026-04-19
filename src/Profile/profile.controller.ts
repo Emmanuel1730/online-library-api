@@ -2,34 +2,42 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   UseGuards,
   Req,
+  Param,
 } from '@nestjs/common';
-
-// ✅ Use your custom guard (cleaner + reusable)
-
-// --- PROFILES IMPORTS ---
 import { ProfileService } from './profile.service';
 import { CreateProfileDto } from './create-profile.dto';
-
-// --- AUTH IMPORTS ---
 import { RolesGuard } from '../Auth/roles.guard';
 import { Roles } from '../Auth/roles.decorator';
 import { Role } from '../Auth/role.enum';
 import { JwtAuthGuard } from 'src/Auth/jwt-auth-guard';
+import { UserRole } from './profile.entity';
 
 @Controller('profiles')
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
 
-  // 🔓 PUBLIC ROUTE (NO GUARDS)
+  // 🔓 PUBLIC: register any user
   @Post()
   createProfile(@Body() profileData: CreateProfileDto) {
     return this.profileService.createProfile(profileData);
   }
 
-  // 🔒 PROTECTED: ONLY ADMIN
+  // 🔒 ADMIN: create another admin
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Post('create-admin')
+  createAdmin(@Body() profileData: CreateProfileDto) {
+    return this.profileService.createProfile({
+      ...profileData,
+      role: UserRole.ADMIN,
+    });
+  }
+
+  // 🔒 ADMIN: get all profiles
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @Get()
@@ -37,16 +45,26 @@ export class ProfileController {
     return this.profileService.getAllProfiles();
   }
 
-  // 🔒 PROTECTED: ANY AUTHENTICATED USER
+  // 🔒 ADMIN: get only admin profiles
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Get('admins')
+  getAdmins() {
+    return this.profileService.getAdmins();
+  }
+
+  // 🔒 ADMIN: update a profile's role or status
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Patch(':id')
+  updateProfile(@Param('id') id: string, @Body() data: any) {
+    return this.profileService.updateProfile(Number(id), data);
+  }
+
+  // 🔒 ANY AUTH: get own profile
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async getMyProfile(@Req() req: any) {
-    if (!req.user) {
-      throw new Error('User not found in request');
-    }
-
-    const userId = req.user.id;
-
-    return this.profileService.getProfileWithRequests(userId);
+    return this.profileService.getProfileWithRequests(req.user.id);
   }
 }

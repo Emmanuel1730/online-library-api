@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan } from 'typeorm';
-import { Profile } from './profile.entity';
+import { Profile, UserRole } from './profile.entity';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -91,4 +91,12 @@ export class ProfileService {
       relations: ['school'],
     });
   }
+
+  async getAdmins() {
+  return this.profileRepository.find({
+    where: { role: UserRole.ADMIN },
+    relations: ['school'],
+    order: { joinDate: 'DESC' },
+  });
+}
 }

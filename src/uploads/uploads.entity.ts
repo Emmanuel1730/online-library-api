@@ -21,6 +21,9 @@ export class Upload {
   @Column()
   fileType: string;
 
+  @Column({ type: 'bigint', default: 0 })
+  fileSize: number;                          // ← new: stores bytes from Multer
+
   @Column()
   schoolId: string;
 

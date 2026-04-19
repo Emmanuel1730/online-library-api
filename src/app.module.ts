@@ -24,6 +24,7 @@ import { SchoolClass } from './classes/classes.entity';
 import { ClassesModule } from './classes/classes.module';
 import { UserActivity } from './activity/user-activity.entity';
 import { ActivityModule } from './activity/activity.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { ActivityModule } from './activity/activity.module';
     PaymentModule,
     ClassesModule,
     ActivityModule,
+    StorageModule
   ],
   controllers: [],
   providers: [SupabaseService],

@@ -76,6 +76,7 @@ export class ResourcesService {
       fileUrl,
       filePath: fileUrl,
       fileType: file.mimetype,
+      fileSize: file.size,             // ← Multer always populates this in bytes
       uploaderId: String(user.id),
       schoolId: String(user.schoolId),
       resource: savedResource,
@@ -96,12 +97,10 @@ export class ResourcesService {
       .leftJoinAndSelect('resource.school', 'school')
       .leftJoinAndSelect('resource.uploader', 'uploader')
       .leftJoinAndSelect('resource.uploads', 'uploads')
-      .leftJoinAndSelect('resource.targetClass', 'targetClass') // ← was missing
+      .leftJoinAndSelect('resource.targetClass', 'targetClass')
       .where('resource.isActive = true');
 
     if (user.role !== UserRole.ADMIN && user.schoolId) {
-      // PUBLIC resources are visible to everyone.
-      // PRIVATE resources are restricted to the user's own school.
       qb.andWhere(
         '(resource.visibility = :public OR school.id = :schoolId)',
         { public: 'PUBLIC', schoolId: user.schoolId },
@@ -129,15 +128,15 @@ export class ResourcesService {
     }
 
     await this.resourceRepo.update(id, {
-      ...(dto.title        && { title: dto.title }),
-      ...(dto.description  && { description: dto.description }),
-      ...(dto.type         && { type: dto.type }),
-      ...(dto.form         && { form: dto.form }),
-      ...(dto.status       && { status: dto.status }),
+      ...(dto.title          && { title: dto.title }),
+      ...(dto.description    && { description: dto.description }),
+      ...(dto.type           && { type: dto.type }),
+      ...(dto.form           && { form: dto.form }),
+      ...(dto.status         && { status: dto.status }),
       ...(dto.targetAudience && { targetAudience: dto.targetAudience }),
-      ...(dto.visibility   && { visibility: dto.visibility }),
-      ...(dto.categoryId   && { category: { id: dto.categoryId } as any }),
-      ...(dto.classId      && { targetClass: { id: dto.classId } as any }),
+      ...(dto.visibility     && { visibility: dto.visibility }),
+      ...(dto.categoryId     && { category: { id: dto.categoryId } as any }),
+      ...(dto.classId        && { targetClass: { id: dto.classId } as any }),
     });
 
     return this.resourceRepo.findOne({
