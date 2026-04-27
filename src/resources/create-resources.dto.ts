@@ -3,9 +3,17 @@ import {
   IsString,
   IsUUID,
   IsOptional,
+  IsBoolean,
+  IsNumber,
+  Min,
 } from 'class-validator';
-
-import { ResourceType, ResourceStatus, ResourceForm, ResourceVisibility } from './resources.entity';
+import { Type } from 'class-transformer';
+import {
+  ResourceType,
+  ResourceStatus,
+  ResourceForm,
+  ResourceVisibility,
+} from './resources.entity';
 
 export class CreateResourceDto {
   @IsString()
@@ -44,4 +52,16 @@ export class CreateResourceDto {
   @IsOptional()
   @IsUUID()
   schoolId?: string;
+
+  // ── Premium fields ───────────────────────────────────────────────
+  @IsOptional()
+  @IsBoolean()
+  isPremium?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  price?: number;
+  // ────────────────────────────────────────────────────────────────
 }

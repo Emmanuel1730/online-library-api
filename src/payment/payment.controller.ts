@@ -6,66 +6,140 @@ import {
   Request,
   Get,
   Query,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { PaymentService } from './payment.service';
 import { AuthGuard } from '@nestjs/passport';
-import { Role } from 'src/Auth/role.enum';
-import { RolesGuard } from 'src/Auth/roles.guard';
-import { Roles } from 'src/Auth/roles.decorator';
+import { ConfigService } from '@nestjs/config';
+
 @Controller('payment')
 export class PaymentController {
-  constructor(private readonly paymentService: PaymentService) {}
+  constructor(
+    private readonly paymentService: PaymentService,
+    private readonly configService: ConfigService,
+  ) {}
 
-  // 1. Endpoint to generate the payment link
-  @UseGuards(AuthGuard('jwt'), RolesGuard) // User must be logged in to pay!
-  @Roles(Role.STUDENT) // Or whatever roles you allow to pay
+  // ─────────────────────────────────────────────────────────────────
+  // POST /api/payment/create-checkout-session
+  // Called by Books.jsx when student clicks "Buy"
+  // Body: { resourceId: string, amount: number }
+  // ─────────────────────────────────────────────────────────────────
+  @UseGuards(AuthGuard('jwt'))
+  @Post('create-checkout-session')
+  async createCheckoutSession(
+    @Request() req,
+    @Body('resourceId') resourceId: string,
+    @Body('amount') amount: number,
+  ) {
+    const { id: userId, email } = req.user;
+    return this.paymentService.initiatePayment(userId, email, amount, resourceId);
+    // Returns: { message, checkoutUrl, transactionReference }
+    // Frontend reads checkoutUrl and redirects: window.location.href = data.checkoutUrl
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // POST /api/payment/initiate  (kept for Postman / direct use)
+  // ─────────────────────────────────────────────────────────────────
+  @UseGuards(AuthGuard('jwt'))
   @Post('initiate')
   async initiateCheckout(
     @Request() req,
-    @Body('amount') amount: number, // Frontend sends the amount they need to pay
+    @Body('amount') amount: number,
+    @Body('resourceId') resourceId?: string,
   ) {
-    const userId = req.user.id;
-    const email = req.user.email;
-
-    return await this.paymentService.initiatePayment(userId, email, amount);
+    const { id: userId, email } = req.user;
+    return this.paymentService.initiatePayment(userId, email, amount, resourceId);
   }
 
-  // 2. Endpoint Pay Changu redirects to on Success
-  // Replace your current 'success' endpoint with this:
+  // ─────────────────────────────────────────────────────────────────
+  // GET /api/payment/success?tx_ref=LIB-xxx
+  // PayChangu redirects the USER'S BROWSER here after a successful payment.
+  // We verify the payment then redirect the browser to the frontend.
+  // ─────────────────────────────────────────────────────────────────
   @Get('success')
-  async paymentSuccess(@Query('tx_ref') txRef: string) {
-    // We grab the tx_ref from the URL and pass it to our service
+  async paymentSuccess(
+    @Query('tx_ref') txRef: string,
+    @Res() res: Response,
+  ) {
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:5173';
+
     if (!txRef) {
-      return 'No transaction reference provided.';
+      return res.redirect(`${frontendUrl}/payment/result?status=error&message=missing_tx_ref`);
     }
-    return await this.paymentService.verifyPayment(txRef);
+
+    const result = await this.paymentService.verifyPayment(txRef);
+
+    // Redirect browser back to the React app with the result as query params
+    if (result.message?.includes('verified successfully')) {
+      return res.redirect(
+        `${frontendUrl}/payment/result?status=success&tx_ref=${txRef}&resourceId=${result.resourceId ?? ''}`,
+      );
+    } else {
+      return res.redirect(
+        `${frontendUrl}/payment/result?status=pending&tx_ref=${txRef}`,
+      );
+    }
   }
 
+  // ─────────────────────────────────────────────────────────────────
+  // GET /api/payment/failed?tx_ref=LIB-xxx
+  // PayChangu redirects the USER'S BROWSER here if they cancel.
+  // ─────────────────────────────────────────────────────────────────
+  @Get('failed')
+  async paymentFailed(
+    @Query('tx_ref') txRef: string,
+    @Res() res: Response,
+  ) {
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:5173';
+
+    if (txRef) {
+      await this.paymentService.markPaymentAsFailed(txRef);
+    }
+
+    return res.redirect(
+      `${frontendUrl}/payment/result?status=failed&tx_ref=${txRef ?? ''}`,
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // POST /api/payment/webhook
+  // PayChangu's SERVER calls this silently in the background.
+  // Must return 200 quickly — no auth guard needed (PayChangu has no JWT).
+  // ─────────────────────────────────────────────────────────────────
   @Post('webhook')
   async handleWebhook(@Body() data: any) {
-    // 1. PayChangu sends the transaction status in the 'status' field
-    if (data.status === 'success') {
-      const transactionId = data.tx_ref; // This matches your library order ID
-
-      console.log(`Payment successful for transaction: ${transactionId}`);
-
-      // 2. logic to unlock the book for the student goes here
-      // await this.paymentService.completeOrder(transactionId);
-    }
-
-    // 3. Always return a 200 OK so PayChangu knows you got the message
-    return { received: true };
+    return this.paymentService.processWebhook(data);
   }
 
-  // 3. Endpoint Pay Changu redirects to on Failure/Cancel
-  // Replace your current @Get('failed') with this:
-  @Get('failed')
-  async paymentFailed(@Query('tx_ref') txRef: string) {
-    if (!txRef) {
-      return 'No transaction reference provided by Pay Changu.';
-    }
+  // ─────────────────────────────────────────────────────────────────
+  // GET /api/payment/my-purchases
+  // Returns the list of resourceIds the logged-in user has purchased.
+  // Books.jsx calls this on load to know which books to unlock.
+  // ─────────────────────────────────────────────────────────────────
+  @UseGuards(AuthGuard('jwt'))
+  @Get('my-purchases')
+  async getMyPurchases(@Request() req) {
+    const resourceIds = await this.paymentService.getUserPurchasedResources(req.user.id);
+    return { purchased: resourceIds };
+  }
 
-    // Call the service to update the database!
-    return await this.paymentService.markPaymentAsFailed(txRef);
+  // ─────────────────────────────────────────────────────────────────
+  // GET /api/payment/has-access?resourceId=xxx
+  // Per-resource access check for individual book pages.
+  // ─────────────────────────────────────────────────────────────────
+  @UseGuards(AuthGuard('jwt'))
+  @Get('has-access')
+  async hasAccess(
+    @Request() req,
+    @Query('resourceId') resourceId: string,
+  ) {
+    const access = await this.paymentService.hasUserPurchasedResource(
+      req.user.id,
+      resourceId,
+    );
+    return { hasAccess: access };
   }
 }

@@ -42,7 +42,6 @@ export class ResourcesService {
     }
 
     const schoolId = user.schoolId;
-
     const school = schoolId
       ? await this.schoolRepo.findOne({ where: { id: schoolId } })
       : null;
@@ -52,6 +51,20 @@ export class ResourcesService {
     }
 
     const fileUrl = await this.supabaseService.uploadFile(file);
+
+    // ── Resolve premium fields ───────────────────────────────────
+    // isPremium comes from FormData as the string "true"/"false";
+    // the @Transform in the DTO converts it to a boolean for us.
+    const isPremium = dto.isPremium ?? false;
+    // If someone marks a resource as premium but forgets to set a price,
+    // throw a clear error rather than silently saving price = 0.
+    if (isPremium && (!dto.price || Number(dto.price) <= 0)) {
+      throw new BadRequestException(
+        'A premium resource must have a price greater than 0',
+      );
+    }
+    const price = isPremium ? Number(dto.price) : 0;
+    // ────────────────────────────────────────────────────────────
 
     const resource = this.resourceRepo.create({
       title: dto.title,
@@ -63,6 +76,8 @@ export class ResourcesService {
       visibility: dto.visibility,
       fileUrl,
       isActive: true,
+      isPremium,
+      price,
       category: dto.categoryId ? ({ id: dto.categoryId } as any) : null,
       targetClass: dto.classId ? ({ id: dto.classId } as any) : null,
       school: schoolId ? ({ id: schoolId } as any) : null,
@@ -76,7 +91,7 @@ export class ResourcesService {
       fileUrl,
       filePath: fileUrl,
       fileType: file.mimetype,
-      fileSize: file.size,             // ← Multer always populates this in bytes
+      fileSize: file.size,
       uploaderId: String(user.id),
       schoolId: String(user.schoolId),
       resource: savedResource,
@@ -108,11 +123,14 @@ export class ResourcesService {
     }
 
     const [data, total] = await qb.getManyAndCount();
-
     return { data, total };
   }
 
-  async update(id: string, dto: Partial<CreateResourceWithFileDto>, user: JwtUser) {
+  async update(
+    id: string,
+    dto: Partial<CreateResourceWithFileDto>,
+    user: JwtUser,
+  ) {
     const resource = await this.resourceRepo.findOne({
       where: { id },
       relations: ['uploader', 'school'],
@@ -127,6 +145,20 @@ export class ResourcesService {
       throw new ForbiddenException('Not allowed to edit this resource');
     }
 
+    // ── Handle premium update ────────────────────────────────────
+    let premiumUpdate: Partial<Resource> = {};
+    if (dto.isPremium !== undefined) {
+      const isPremium = dto.isPremium;
+      const price = isPremium ? Number(dto.price ?? resource.price) : 0;
+      if (isPremium && price <= 0) {
+        throw new BadRequestException(
+          'A premium resource must have a price greater than 0',
+        );
+      }
+      premiumUpdate = { isPremium, price };
+    }
+    // ────────────────────────────────────────────────────────────
+
     await this.resourceRepo.update(id, {
       ...(dto.title          && { title: dto.title }),
       ...(dto.description    && { description: dto.description }),
@@ -137,6 +169,7 @@ export class ResourcesService {
       ...(dto.visibility     && { visibility: dto.visibility }),
       ...(dto.categoryId     && { category: { id: dto.categoryId } as any }),
       ...(dto.classId        && { targetClass: { id: dto.classId } as any }),
+      ...premiumUpdate,
     });
 
     return this.resourceRepo.findOne({

@@ -1,5 +1,19 @@
-import { IsString, IsEnum, IsUUID, IsOptional } from 'class-validator';
-import { ResourceStatus, ResourceType, ResourceForm, ResourceVisibility } from './resources.entity';
+import {
+  IsString,
+  IsEnum,
+  IsUUID,
+  IsOptional,
+  IsBoolean,
+  IsNumber,
+  Min,
+} from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+  ResourceStatus,
+  ResourceType,
+  ResourceForm,
+  ResourceVisibility,
+} from './resources.entity';
 
 export class CreateResourceWithFileDto {
   @IsString()
@@ -38,4 +52,18 @@ export class CreateResourceWithFileDto {
   @IsOptional()
   @IsUUID()
   schoolId?: string;
+
+  // ── Premium fields ───────────────────────────────────────────────
+  // FormData sends everything as strings, so we transform before validating
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  isPremium?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  price?: number;
+  // ────────────────────────────────────────────────────────────────
 }

@@ -2,21 +2,26 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Payment, PaymentStatus } from './payment.entity';
+import { BookPurchase } from './book-purchase.entity';
 import { Repository } from 'typeorm';
+
 @Injectable()
 export class PaymentService {
   constructor(
     private configService: ConfigService,
-    // Inject the database connection here:
     @InjectRepository(Payment)
     private paymentRepository: Repository<Payment>,
+    @InjectRepository(BookPurchase)
+    private bookPurchaseRepository: Repository<BookPurchase>,
   ) {}
 
-  async initiatePayment(userId: number, email: string, amount: number) {
-    // 1. Grab the secret key from .env
+  async initiatePayment(
+    userId: number,
+    email: string,
+    amount: number,
+    resourceId?: string,
+  ) {
     const secretKey = this.configService.get<string>('PAYCHANGU_SECRET_KEY');
-    console.log('My Secret Key is:', secretKey);
-    // Safety check: ensure .env is actually loaded
     if (!secretKey) {
       throw new HttpException(
         'Payment gateway not configured',
@@ -26,35 +31,31 @@ export class PaymentService {
 
     const txRef = `LIB-${Date.now()}-${userId}`;
 
+    // FIX: use undefined instead of null – TypeORM DeepPartial does not accept null here
     const newPayment = this.paymentRepository.create({
-      userId: userId,
-      amount: amount,
+      userId,
+      amount,
       transactionReference: txRef,
       status: PaymentStatus.PENDING,
+      resourceId: resourceId ?? undefined,
     });
     await this.paymentRepository.save(newPayment);
 
-    // 2. Remove secret_key from here!
+    const baseUrl =
+      this.configService.get<string>('APP_BASE_URL') ??
+      'https://dibasic-nonvasculous-stanford.ngrok-free.dev';
+
     const payload = {
-      amount: amount,
+      amount,
       currency: 'MWK',
-      email: email,
+      email,
       first_name: 'Library',
       last_name: 'Member',
-
-      // 1. FRONT DOOR: Where the user's browser goes AFTER paying
-      callback_url:
-        'https://dibasic-nonvasculous-stanford.ngrok-free.dev/api/payment/success',
-
-      // 2. CANCELLATION DOOR: Where the browser goes if they cancel
-      return_url:
-        'https://dibasic-nonvasculous-stanford.ngrok-free.dev/api/payment/failed',
-
+      callback_url: `${baseUrl}/payment/success`,
+      return_url: `${baseUrl}/payment/failed`,
       tx_ref: txRef,
-
-      // 3. BACK DOOR: Where Pay Changu's server secretly sends the POST data
-      webhook_url:
-        'https://dibasic-nonvasculous-stanford.ngrok-free.dev/api/payment/webhook',
+      webhook_url: `${baseUrl}/payment/webhook`,
+      meta: resourceId ? { resourceId } : undefined,
     };
 
     try {
@@ -63,7 +64,6 @@ export class PaymentService {
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
-          // 3. Add it to the Authorization Header here!
           Authorization: `Bearer ${secretKey}`,
         },
         body: JSON.stringify(payload),
@@ -78,7 +78,6 @@ export class PaymentService {
           transactionReference: txRef,
         };
       } else {
-        // If Pay Changu rejects it, send their exact error message to Postman
         throw new HttpException(
           data.message || 'Payment initiation failed',
           HttpStatus.BAD_REQUEST,
@@ -93,7 +92,6 @@ export class PaymentService {
     }
   }
 
-  // Add this inside PaymentService
   async verifyPayment(txRef: string) {
     const secretKey = this.configService.get<string>('PAYCHANGU_SECRET_KEY');
 
@@ -110,9 +108,7 @@ export class PaymentService {
       );
 
       const data = await response.json();
-
-      // 1. Let's force it to print everything so we aren't guessing
-      console.log('--- Pay Changu Response ---', data);
+      console.log('--- Pay Changu Verify Response ---', data);
 
       const payment = await this.paymentRepository.findOne({
         where: { transactionReference: txRef },
@@ -122,7 +118,6 @@ export class PaymentService {
         return { message: 'Payment not found in our database.' };
       }
 
-      // 2. BULLETPROOF CHECK: Only look for data.data.status IF data.data actually exists!
       const isSuccessful =
         data.status === 'success' &&
         data.data &&
@@ -131,19 +126,28 @@ export class PaymentService {
       if (isSuccessful) {
         payment.status = PaymentStatus.SUCCESS;
         await this.paymentRepository.save(payment);
+
+        if (payment.resourceId) {
+          await this.grantBookAccess(
+            payment.userId,
+            payment.resourceId,
+            txRef,
+            Number(payment.amount),
+          );
+        }
+
         return {
           message: 'Payment verified successfully!',
           transaction: txRef,
+          resourceId: payment.resourceId ?? null,
         };
       } else {
-        // We won't mark it FAILED right away in case it's just delayed
         return {
           message: 'Payment is still pending or not completed.',
           payChanguSaid: data.message || 'No message provided',
         };
       }
     } catch (error) {
-      // 3. Catch the exact error if it crashes again
       console.error('--- Verification Crashed ---', error);
       return {
         message: 'Something went wrong verifying the payment.',
@@ -151,7 +155,93 @@ export class PaymentService {
       };
     }
   }
-  // Add this inside PaymentService
+
+  async grantBookAccess(
+    userId: number,
+    resourceId: string,
+    txRef: string,
+    amount: number,
+  ) {
+    const existing = await this.bookPurchaseRepository.findOne({
+      where: { userId, resourceId },
+    });
+
+    if (existing) {
+      console.log(`ℹ️  User ${userId} already owns resource ${resourceId}.`);
+      return;
+    }
+
+    const purchase = this.bookPurchaseRepository.create({
+      userId,
+      resourceId,
+      transactionReference: txRef,
+      amountPaid: amount,
+      currency: 'MWK',
+    });
+
+    await this.bookPurchaseRepository.save(purchase);
+    console.log(`✅ Access granted: user ${userId} → resource ${resourceId}`);
+  }
+
+  async hasUserPurchasedResource(
+    userId: number,
+    resourceId: string,
+  ): Promise<boolean> {
+    const purchase = await this.bookPurchaseRepository.findOne({
+      where: { userId, resourceId },
+    });
+    return !!purchase;
+  }
+
+  async getUserPurchasedResources(userId: number): Promise<string[]> {
+    const purchases = await this.bookPurchaseRepository.find({
+      where: { userId },
+    });
+    return purchases.map((p) => p.resourceId);
+  }
+
+  async processWebhook(payload: any) {
+    console.log('--- WEBHOOK RECEIVED FROM PAY CHANGU ---', payload);
+
+    const txRef = payload?.tx_ref ?? payload?.data?.tx_ref;
+    const status = payload?.status ?? payload?.data?.status;
+
+    if (!txRef) {
+      return { status: 'ignored', message: 'No transaction reference found' };
+    }
+
+    const payment = await this.paymentRepository.findOne({
+      where: { transactionReference: txRef },
+    });
+
+    if (!payment) {
+      console.log(`Webhook Error: Payment ${txRef} not found in DB.`);
+      return { status: 'error', message: 'Payment not found' };
+    }
+
+    if (status === 'success' || status === 'successful') {
+      payment.status = PaymentStatus.SUCCESS;
+      await this.paymentRepository.save(payment);
+
+      if (payment.resourceId) {
+        await this.grantBookAccess(
+          payment.userId,
+          payment.resourceId,
+          txRef,
+          Number(payment.amount),
+        );
+      }
+
+      console.log(`✅ Payment ${txRef} → SUCCESS via Webhook`);
+    } else {
+      payment.status = PaymentStatus.FAILED;
+      await this.paymentRepository.save(payment);
+      console.log(`❌ Payment ${txRef} → FAILED via Webhook`);
+    }
+
+    return { status: 'success', message: 'Webhook processed' };
+  }
+
   async markPaymentAsFailed(txRef: string) {
     console.log(`--- User Cancelled/Failed Payment: ${txRef} ---`);
 
@@ -163,7 +253,6 @@ export class PaymentService {
       return { message: 'Payment not found.' };
     }
 
-    // Update the database to FAILED
     payment.status = PaymentStatus.FAILED;
     await this.paymentRepository.save(payment);
 
@@ -172,62 +261,5 @@ export class PaymentService {
         'Payment was cancelled or failed. Your database has been updated.',
       transaction: txRef,
     };
-  }
-
-  // Add this inside PaymentService
-  async processWebhook(payload: any) {
-    console.log('--- WEBHOOK RECEIVED FROM PAY CHANGU ---', payload);
-
-    // Pay Changu sends the transaction reference inside the payload
-    // Depending on their exact format, it might be payload.tx_ref or payload.data.tx_ref
-    const txRef = payload?.tx_ref || payload?.data?.tx_ref;
-    const status = payload?.status || payload?.data?.status;
-
-    // If there is no transaction reference, just ignore it
-    if (!txRef) {
-      return { status: 'ignored', message: 'No transaction reference found' };
-    }
-
-    // 1. Find the payment in our database
-    const payment = await this.paymentRepository.findOne({
-      where: { transactionReference: txRef },
-    });
-
-    if (!payment) {
-      console.log(`Webhook Error: Payment ${txRef} not found in DB.`);
-      return { status: 'error', message: 'Payment not found' };
-    }
-
-    // 2. Update the status based on what Pay Changu tells us
-    if (status === 'success' || status === 'successful') {
-      payment.status = PaymentStatus.SUCCESS;
-      console.log(
-        `✅ Payment ${txRef} successfully updated to SUCCESS via Webhook!`,
-      );
-    } else {
-      payment.status = PaymentStatus.FAILED;
-      console.log(`❌ Payment ${txRef} marked as FAILED via Webhook.`);
-    }
-
-    // 3. Save the new status to the database!
-    await this.paymentRepository.save(payment);
-
-    // 4. Always return a 200 OK so Pay Changu knows we received the message
-    return { status: 'success', message: 'Webhook processed' };
-  }
-  async completeOrder(txRef: string) {
-    // 1. Find the pending payment in the database using the tx_ref
-    const payment = await this.paymentRepository.findOne({
-      where: { transactionReference: txRef },
-    });
-
-    if (payment) {
-      // 2. Change the status from PENDING to SUCCESS
-      payment.status = PaymentStatus.SUCCESS; // Or whatever your enum/string is
-
-      // 3. Save it back to the database
-      await this.paymentRepository.save(payment);
-      console.log('Database updated to SUCCESS!');
-    }
   }
 }

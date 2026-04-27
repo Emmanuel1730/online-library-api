@@ -2,7 +2,19 @@ import { Category } from 'src/categories/categories.entity';
 import { Profile } from 'src/Profile/profile.entity';
 import { Resource } from 'src/resources/resources.entity';
 import { SchoolClass } from 'src/classes/classes.entity';
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToMany,
+  CreateDateColumn,
+} from 'typeorm';
+
+export enum SchoolRegistrationStatus {
+  PENDING_PAYMENT = 'PENDING_PAYMENT', // signed up but hasn't paid yet
+  ACTIVE          = 'ACTIVE',          // paid and approved
+  SUSPENDED       = 'SUSPENDED',
+}
 
 @Entity()
 export class School {
@@ -15,8 +27,26 @@ export class School {
   @Column({ nullable: true })
   location: string;
 
+  @Column({ nullable: true })
+  phone: string;
+
   @Column({ default: true })
   teachersCanUpload: boolean;
+
+  // ── Registration payment tracking ──────────────────────────────
+  @Column({
+    type: 'enum',
+    enum: SchoolRegistrationStatus,
+    default: SchoolRegistrationStatus.PENDING_PAYMENT,
+  })
+  registrationStatus: SchoolRegistrationStatus;
+
+  @Column({ nullable: true })
+  registrationTxRef: string; // the PayChangu tx_ref for the registration fee
+
+  @Column('decimal', { precision: 10, scale: 2, nullable: true })
+  registrationFeePaid: number;
+  // ──────────────────────────────────────────────────────────────
 
   @OneToMany(() => Profile, (profile) => profile.school)
   profiles: Profile[];
@@ -29,4 +59,7 @@ export class School {
 
   @OneToMany(() => SchoolClass, (schoolClass) => schoolClass.school)
   classes: SchoolClass[];
+
+  @CreateDateColumn()
+  createdAt: Date;
 }

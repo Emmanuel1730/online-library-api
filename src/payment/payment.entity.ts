@@ -5,7 +5,6 @@ import {
   CreateDateColumn,
 } from 'typeorm';
 
-// These are the 3 states a payment can be in
 export enum PaymentStatus {
   PENDING = 'PENDING',
   SUCCESS = 'SUCCESS',
@@ -18,21 +17,25 @@ export class Payment {
   id: number;
 
   @Column()
-  userId: number; // Who is paying?
+  userId: number;
 
   @Column('decimal', { precision: 10, scale: 2 })
-  amount: number; // How much?
+  amount: number;
 
   @Column({ default: 'MWK' })
   currency: string;
 
   @Column({ unique: true })
-  transactionReference: string; // The unique Pay Changu ID (e.g., LIB-12345-1)
+  transactionReference: string;
+
+  // ── NEW: which resource this payment is for (null = general subscription) ──
+  @Column({ nullable: true })
+  resourceId: string;
 
   @Column({
     type: 'enum',
     enum: PaymentStatus,
-    default: PaymentStatus.PENDING, // Always starts as pending
+    default: PaymentStatus.PENDING,
   })
   status: PaymentStatus;
 

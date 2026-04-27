@@ -8,7 +8,6 @@ import {
   UpdateDateColumn,
   JoinColumn,
 } from 'typeorm';
-
 import { School } from '../school/school.entity';
 import { Category } from 'src/categories/categories.entity';
 import { SchoolClass } from 'src/classes/classes.entity';
@@ -80,8 +79,17 @@ export class Resource {
   @Column({ default: true })
   isActive: boolean;
 
-  // --- Relations ---
+  // ── Premium fields ───────────────────────────────────────────────
+  /** true = paid resource, false = free */
+  @Column({ default: false })
+  isPremium: boolean;
 
+  /** Price in MWK. 0 for free resources. */
+  @Column('decimal', { precision: 10, scale: 2, default: 0 })
+  price: number;
+  // ────────────────────────────────────────────────────────────────
+
+  // --- Relations ---
   @ManyToOne(() => Category, { nullable: true })
   category: Category;
 
