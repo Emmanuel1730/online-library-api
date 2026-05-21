@@ -92,14 +92,18 @@ Rules:
     return this.repo.save(quiz);
   }
 
+  // FIX 1: exclude 'ai-saved' quizzes so they don't appear in teacher's quiz list
   async findMyQuizzes(userId: number) {
-    return this.repo.find({
-      where: { createdById: userId },
-      order: { createdAt: 'DESC' },
-    });
+    return this.repo
+      .createQueryBuilder('quiz')
+      .where('quiz.createdById = :userId', { userId })
+      .andWhere('quiz.status != :aiStatus', { aiStatus: 'ai-saved' })
+      .orderBy('quiz.createdAt', 'DESC')
+      .getMany();
   }
 
   // Students: see public quizzes + private quizzes from their school
+  // Also excludes 'ai-saved' quizzes from student browse
   async findForStudent(schoolId: string | null) {
     const qb = this.repo.createQueryBuilder('quiz')
       .where('quiz.status = :status', { status: 'published' })
@@ -189,32 +193,148 @@ Rules:
     const avgScore = total > 0
       ? Math.round(all.reduce((s, a) => s + a.percentage, 0) / total)
       : 0;
-    const aiCount  = all.filter((a) => a.source === QuizSource.AI).length;
+    const aiCount      = all.filter((a) => a.source === QuizSource.AI).length;
     const teacherCount = all.filter((a) => a.source === QuizSource.TEACHER).length;
     return { total, avgScore, aiCount, teacherCount };
   }
 
   async findAll() {
-  return this.repo.find({
-    relations: ['createdBy'],
-    order: { createdAt: 'DESC' },
-  });
-}
- 
-/** Admin: get all AI + teacher quiz attempts */
-async getAllAttempts() {
-  return this.attemptRepo.find({
-    relations: ['student'],
-    order: { completedAt: 'DESC' },
-    take: 200,
-  });
-}
- 
-/** Admin: hard-delete any quiz */
-async adminRemove(id: string) {
-  const quiz = await this.repo.findOne({ where: { id } });
-  if (!quiz) throw new NotFoundException('Quiz not found');
-  await this.repo.remove(quiz);
-  return { message: 'Quiz deleted', id };
-}
+    return this.repo.find({
+      relations: ['createdBy'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  /** Admin: get all AI + teacher quiz attempts */
+  async getAllAttempts() {
+    return this.attemptRepo.find({
+      relations: ['student'],
+      order: { completedAt: 'DESC' },
+      take: 200,
+    });
+  }
+
+  /** Admin: hard-delete any quiz */
+  async adminRemove(id: string) {
+    const quiz = await this.repo.findOne({ where: { id } });
+    if (!quiz) throw new NotFoundException('Quiz not found');
+    await this.repo.remove(quiz);
+    return { message: 'Quiz deleted', id };
+  }
+
+  // ── Save AI Quiz to DB ────────────────────────────────────────────────────
+  // FIX 2: use status 'ai-saved' so it never bleeds into teacher quiz lists
+  async saveAIQuiz(dto: any, userId: number) {
+    const quiz = this.repo.create({
+      title:       dto.topic ?? 'AI Quiz',
+      subject:     dto.subject,
+      form:        dto.level,
+      duration:    '30 min',
+      description: `AI-generated quiz on ${dto.topic}`,
+      mode:        'online',
+      visibility:  QuizVisibility.PUBLIC,
+      questions:   (dto.questions ?? []).map((q: any, i: number) => ({
+        id:      `${i}`,
+        text:    q.question ?? q.text,
+        options: q.options,
+        answer:  q.correct ?? q.answer ?? 0,
+      })),
+      status:      'ai-saved',   // ← was 'published', now 'ai-saved'
+      createdById: userId,
+    });
+    return this.repo.save(quiz);
+  }
+
+  // ── Get saved AI quizzes for a student ───────────────────────────────────
+  // Matches both 'ai-saved' (new) and old records saved as 'published' by the
+  // same student that have an AI-style description, using an OR query.
+  async getSavedAIQuizzes(userId: number) {
+    return this.repo
+      .createQueryBuilder('quiz')
+      .where('quiz.createdById = :userId', { userId })
+      .andWhere(
+        "(quiz.status = 'ai-saved' OR (quiz.status = 'published' AND quiz.description LIKE :prefix))",
+        { prefix: 'AI-generated quiz on%' }
+      )
+      .orderBy('quiz.createdAt', 'DESC')
+      .getMany();
+  }
+
+  // ── Teacher dashboard stats ───────────────────────────────────────────────
+  async getTeacherStats(teacherId: number) {
+    const myQuizzes = await this.repo.find({
+      where: { createdById: teacherId },
+      select: ['id'],
+    });
+    const myQuizIds = myQuizzes.map(q => q.id);
+
+    let attempts: QuizAttempt[] = [];
+    if (myQuizIds.length > 0) {
+      attempts = await this.attemptRepo
+        .createQueryBuilder('a')
+        .leftJoinAndSelect('a.student', 'student')
+        .where('a.quizId IN (:...ids)', { ids: myQuizIds })
+        .getMany();
+    }
+
+    const uniqueStudents = new Set(attempts.map(a => a.studentId));
+    const avgScore = attempts.length > 0
+      ? Math.round(attempts.reduce((s, a) => s + a.percentage, 0) / attempts.length)
+      : 0;
+
+    return {
+      totalStudents: uniqueStudents.size,
+      avgScore,
+      totalAttempts: attempts.length,
+    };
+  }
+
+  // ── Teacher: attempts for their quizzes + AI attempts from same-school students ──
+  // FIX 4: also include AI attempts (quizId = null) from students at the teacher's school
+  async getTeacherQuizAttempts(teacherId: number) {
+    // Step 1: get teacher's own quiz IDs
+    const myQuizzes = await this.repo.find({
+      where: { createdById: teacherId },
+      select: ['id'],
+    });
+    const myQuizIds = myQuizzes.map(q => q.id);
+
+    // Step 2: get teacher's schoolId from their profile
+    // We can derive this by looking at their own attempts or from a Profile join.
+    // Simplest: pull it from the student relation on any of their quiz attempts.
+    // But teachers may not have attempts — so query the Profile table directly.
+    const teacherProfile = await this.attemptRepo.manager
+      .getRepository('Profile')
+      .findOne({ where: { id: teacherId }, relations: ['school'] })
+      .catch(() => null);
+
+    const teacherSchoolId: string | null = teacherProfile?.school?.id ?? teacherProfile?.schoolId ?? null;
+
+    // Step 3: build the query
+    // Include: (a) attempts on teacher's quizzes OR (b) AI attempts from same-school students
+    const qb = this.attemptRepo
+      .createQueryBuilder('a')
+      .leftJoinAndSelect('a.student', 'student')
+      .leftJoinAndSelect('student.school', 'school')
+      .orderBy('a.completedAt', 'DESC')
+      .take(500);
+
+    if (myQuizIds.length > 0 && teacherSchoolId) {
+      qb.where(
+        '(a.quizId IN (:...ids)) OR (a.source = :aiSource AND student.schoolId = :schoolId)',
+        { ids: myQuizIds, aiSource: QuizSource.AI, schoolId: teacherSchoolId }
+      );
+    } else if (myQuizIds.length > 0) {
+      qb.where('a.quizId IN (:...ids)', { ids: myQuizIds });
+    } else if (teacherSchoolId) {
+      qb.where('a.source = :aiSource AND student.schoolId = :schoolId',
+        { aiSource: QuizSource.AI, schoolId: teacherSchoolId }
+      );
+    } else {
+      // Nothing to scope to — return empty
+      return [];
+    }
+
+    return qb.getMany();
+  }
 }

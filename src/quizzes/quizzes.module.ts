@@ -4,9 +4,9 @@ import { Quiz } from './quizzes.entity';
 import { QuizAttempt } from './quizzes-attempt.entity';
 import { QuizzesController } from './quizzes.controller';
 import { QuizzesService } from './quizzes.service';
-import { ClassResource } from 'src/class-resource/class-resource.entity';
-import { ClassResourceController } from 'src/class-resource/class-resource.controller';
-import { ClassResourceService } from 'src/class-resource/class-resource.service';
+import { ClassResource } from '../class-resource/class-resource.entity';
+import { ClassResourceController } from '../class-resource/class-resource.controller';
+import { ClassResourceService } from '../class-resource/class-resource.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Quiz, QuizAttempt, ClassResource])],

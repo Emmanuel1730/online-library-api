@@ -1,4 +1,4 @@
-import { Resource } from 'src/resources/resources.entity';
+import { Resource } from '../resources/resources.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,

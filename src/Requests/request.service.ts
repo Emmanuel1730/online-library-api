@@ -7,8 +7,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Request } from './request.entity';
 import { createClient } from '@supabase/supabase-js';
-import { NotificationService } from 'src/notification/notification.service';
-import { NotificationType } from 'src/notification/notification.entity';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/notification.entity';
 import { CreateRequestDto } from './create-request.dto';
 
 @Injectable()

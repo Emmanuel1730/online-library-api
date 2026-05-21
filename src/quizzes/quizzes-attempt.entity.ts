@@ -6,7 +6,7 @@ import {
   CreateDateColumn,
   JoinColumn,
 } from 'typeorm';
-import { Profile } from 'src/Profile/profile.entity';
+import { Profile } from '../Profile/profile.entity';
 import { Quiz } from './quizzes.entity';
 
 export enum QuizSource {

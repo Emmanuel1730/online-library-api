@@ -6,9 +6,9 @@ import {
   CreateDateColumn,
   JoinColumn,
 } from 'typeorm';
-import { Resource } from 'src/resources/resources.entity';
-import { Profile } from 'src/Profile/profile.entity';
-import { School } from 'src/school/school.entity';
+import { Resource } from '../resources/resources.entity';
+import { Profile } from '../Profile/profile.entity';
+import { School } from '../school/school.entity';
 
 export enum QuizVisibility {
   PUBLIC  = 'PUBLIC',

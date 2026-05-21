@@ -7,8 +7,8 @@ import {
   Unique,
   Column,
 } from 'typeorm';
-import { SchoolClass } from 'src/classes/classes.entity';
-import { Resource } from 'src/resources/resources.entity';
+import { SchoolClass } from '../classes/classes.entity';
+import { Resource } from '../resources/resources.entity';
 
 @Entity()
 @Unique(['classId', 'resourceId'])

@@ -2,7 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { SchoolClass } from './classes.entity';
 import { Repository } from 'typeorm';
-import { UserRole } from 'src/Profile/profile.entity';
+import { UserRole } from '../Profile/profile.entity';
 
 @Injectable()
 export class ClassesService {

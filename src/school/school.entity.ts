@@ -1,7 +1,7 @@
-import { Category } from 'src/categories/categories.entity';
-import { Profile } from 'src/Profile/profile.entity';
-import { Resource } from 'src/resources/resources.entity';
-import { SchoolClass } from 'src/classes/classes.entity';
+import { Category } from '../categories/categories.entity';
+import { Profile } from '../Profile/profile.entity';
+import { Resource } from '../resources/resources.entity';
+import { SchoolClass } from '../classes/classes.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,

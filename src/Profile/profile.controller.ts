@@ -13,7 +13,7 @@ import { CreateProfileDto } from './create-profile.dto';
 import { RolesGuard } from '../Auth/roles.guard';
 import { Roles } from '../Auth/roles.decorator';
 import { Role } from '../Auth/role.enum';
-import { JwtAuthGuard } from 'src/Auth/jwt-auth-guard';
+import { JwtAuthGuard } from '../Auth/jwt-auth-guard';
 import { UserRole } from './profile.entity';
 
 @Controller('profiles')

@@ -3,7 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProfileController } from './profile.controller';
 import { ProfileService } from './profile.service';
 import { Profile } from './profile.entity';
-import { AuthModule } from 'src/Auth/auth.module';
+import { AuthModule } from '../Auth/auth.module';
 
 @Module({
   imports: [

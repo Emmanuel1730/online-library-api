@@ -1,6 +1,6 @@
 // categories/category.entity.ts
-import { Resource } from 'src/resources/resources.entity';
-import { School } from 'src/school/school.entity';
+import { Resource } from '../resources/resources.entity';
+import { School } from '../school/school.entity';
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany } from 'typeorm';
 
 

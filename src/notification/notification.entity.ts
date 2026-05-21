@@ -6,7 +6,7 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import { Profile } from 'src/Profile/profile.entity';
+import { Profile } from '../Profile/profile.entity';
 
 export enum NotificationType {
   REQUEST_CREATED    = 'REQUEST_CREATED',

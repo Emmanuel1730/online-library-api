@@ -9,11 +9,11 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { School } from '../school/school.entity';
-import { Category } from 'src/categories/categories.entity';
-import { SchoolClass } from 'src/classes/classes.entity';
-import { Profile } from 'src/Profile/profile.entity';
-import { Upload } from 'src/uploads/uploads.entity';
-import { Quiz } from 'src/quizzes/quizzes.entity';
+import { Category } from '../categories/categories.entity';
+import { SchoolClass } from '../classes/classes.entity';
+import { Profile } from '../Profile/profile.entity';
+import { Upload } from '../uploads/uploads.entity';
+import { Quiz } from '../quizzes/quizzes.entity';
 
 export enum ResourceType {
   PDF = 'PDF',

@@ -17,7 +17,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ResourcesService } from './resources.service';
 import { CreateResourceWithFileDto } from './create-resource-with-file.dto';
 import { AuthGuard } from '@nestjs/passport';
-import { JwtUser } from 'src/Auth/jwt-user.inteface';
+import { JwtUser } from '../Auth/jwt-user.inteface';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('resources')

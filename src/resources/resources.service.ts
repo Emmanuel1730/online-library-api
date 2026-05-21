@@ -8,12 +8,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { Resource } from './resources.entity';
-import { Upload } from 'src/uploads/uploads.entity';
-import { SupabaseService } from 'src/supabase/supabase.service';
+import { Upload } from '../uploads/uploads.entity';
+import { SupabaseService } from '../supabase/supabase.service';
 import { CreateResourceWithFileDto } from './create-resource-with-file.dto';
-import { School } from 'src/school/school.entity';
-import { UserRole } from 'src/Profile/profile.entity';
-import { JwtUser } from 'src/Auth/jwt-user.inteface';
+import { School } from '../school/school.entity';
+import { UserRole } from '../Profile/profile.entity';
+import { JwtUser } from '../Auth/jwt-user.inteface';
 
 @Injectable()
 export class ResourcesService {

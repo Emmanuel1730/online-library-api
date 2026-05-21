@@ -15,9 +15,9 @@ import { SchoolService } from './school.service';
 import { CreateSchoolDto } from './create-school.dto';
 import { ConfigService } from '@nestjs/config';
 import { AuthGuard } from '@nestjs/passport';
-import { RolesGuard } from 'src/Auth/roles.guard';
-import { Roles } from 'src/Auth/roles.decorator';
-import { Role } from 'src/Auth/role.enum';
+import { RolesGuard } from '../Auth/roles.guard';
+import { Roles } from '../Auth/roles.decorator';
+import { Role } from '../Auth/role.enum';
 
 @Controller('school')
 export class SchoolController {

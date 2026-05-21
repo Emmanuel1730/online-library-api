@@ -8,10 +8,10 @@ import {
   Req,
 } from '@nestjs/common';
 import { NotificationService } from './notification.service';
-import { JwtAuthGuard } from 'src/Auth/jwt-auth-guard';
-import { RolesGuard } from 'src/Auth/roles.guard';
-import { Roles } from 'src/Auth/roles.decorator';
-import { Role } from 'src/Auth/role.enum';
+import { JwtAuthGuard } from '../Auth/jwt-auth-guard';
+import { RolesGuard } from '../Auth/roles.guard';
+import { Roles } from '../Auth/roles.decorator';
+import { Role } from '../Auth/role.enum';
 
 @Controller('notifications')
 @UseGuards(JwtAuthGuard, RolesGuard)

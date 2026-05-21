@@ -1,4 +1,4 @@
-import { Profile } from 'src/Profile/profile.entity';
+import { Profile } from '../Profile/profile.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,
