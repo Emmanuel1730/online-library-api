@@ -42,8 +42,7 @@ export class PaymentService {
     await this.paymentRepository.save(newPayment);
 
     const baseUrl =
-      this.configService.get<string>('APP_BASE_URL') ??
-      'https://dibasic-nonvasculous-stanford.ngrok-free.dev';
+      this.configService.get<string>('APP_BASE_URL')
 
     const payload = {
       amount,
