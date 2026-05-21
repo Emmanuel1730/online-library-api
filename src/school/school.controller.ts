@@ -49,32 +49,58 @@ export class SchoolController {
   }
 
   // POST /api/school/:id/pay
+  // Returns { secretKey, payload } — browser uses these to call PayChangu directly,
+  // bypassing Render free-tier's outbound network restriction.
   @Post(':id/pay')
   pay(@Param('id') id: string, @Body('email') email: string) {
-    return this.schoolService.initiateRegistrationPayment(id, email);
+    return this.schoolService.getPaymentPayload(id, email);
   }
 
   // GET /api/school/payment/success?tx_ref=SCH-xxx
+  // PayChangu redirects the user's browser here after a successful payment.
+  // NOTE: on Render free tier this verify call may also timeout.
+  // The webhook below is the reliable activation path — this is just a UX redirect.
   @Get('payment/success')
   async paymentSuccess(@Query('tx_ref') txRef: string, @Res() res: Response) {
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:5173';
-    if (!txRef) return res.redirect(`${frontendUrl}/school/register?step=result&status=error`);
-    const success = await this.schoolService.handlePaymentSuccess(txRef);
-    return res.redirect(
-      success
-        ? `${frontendUrl}/school/register?step=result&status=success&tx_ref=${txRef}`
-        : `${frontendUrl}/school/register?step=result&status=pending&tx_ref=${txRef}`,
-    );
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:5173';
+
+    if (!txRef) {
+      return res.redirect(
+        `${frontendUrl}/school/register?step=result&status=error`,
+      );
+    }
+
+    try {
+      const success = await this.schoolService.handlePaymentSuccess(txRef);
+      return res.redirect(
+        success
+          ? `${frontendUrl}/school/register?step=result&status=success&tx_ref=${txRef}`
+          : `${frontendUrl}/school/register?step=result&status=pending&tx_ref=${txRef}`,
+      );
+    } catch {
+      // If verify times out (Render free tier), still redirect to success —
+      // the webhook will activate the school in the background.
+      return res.redirect(
+        `${frontendUrl}/school/register?step=result&status=success&tx_ref=${txRef}`,
+      );
+    }
   }
 
   // GET /api/school/payment/failed?tx_ref=SCH-xxx
+  // PayChangu redirects the user's browser here if they cancel / card declines.
   @Get('payment/failed')
   async paymentFailed(@Query('tx_ref') txRef: string, @Res() res: Response) {
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:5173';
-    return res.redirect(`${frontendUrl}/school/register?step=result&status=failed&tx_ref=${txRef ?? ''}`);
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:5173';
+    return res.redirect(
+      `${frontendUrl}/school/register?step=result&status=failed&tx_ref=${txRef ?? ''}`,
+    );
   }
 
   // POST /api/school/payment/webhook
+  // PayChangu's own servers call this silently — no Render outbound restriction applies.
+  // This is the RELIABLE activation path.
   @Post('payment/webhook')
   webhook(@Body() payload: any) {
     return this.schoolService.handleWebhook(payload);
