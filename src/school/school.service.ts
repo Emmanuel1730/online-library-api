@@ -23,7 +23,6 @@ export class SchoolService {
     return this.repo.save(school);
   }
 
-  // ── NEW: update name / location / phone ──────────────────────────
   async update(id: string, dto: Partial<CreateSchoolDto>) {
     const school = await this.repo.findOne({ where: { id } });
     if (!school) throw new NotFoundException('School not found');
@@ -31,7 +30,6 @@ export class SchoolService {
     return this.repo.save(school);
   }
 
-  // ── NEW: delete school ───────────────────────────────────────────
   async remove(id: string) {
     const school = await this.repo.findOne({ where: { id } });
     if (!school) throw new NotFoundException('School not found');
@@ -39,7 +37,9 @@ export class SchoolService {
     return { message: 'School deleted', id };
   }
 
-  async initiateRegistrationPayment(schoolId: string, email: string) {
+  // ── Returns the signed PayChangu payload so the BROWSER can POST it directly.
+  // This avoids Render free-tier's outbound network block.
+  async getPaymentPayload(schoolId: string, email: string) {
     const school = await this.repo.findOne({ where: { id: schoolId } });
     if (!school) throw new NotFoundException('School not found');
 
@@ -50,58 +50,53 @@ export class SchoolService {
     const secretKey = this.configService.get<string>('PAYCHANGU_SECRET_KEY');
     if (!secretKey) throw new BadRequestException('Payment gateway not configured');
 
-    const baseUrl = this.configService.get<string>('APP_BASE_URL');
-    const txRef   = `SCH-${Date.now()}-${schoolId.slice(0, 8)}`;
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:5173';
+    const baseUrl =
+      this.configService.get<string>('APP_BASE_URL') ?? 'http://localhost:3000';
 
+    const txRef = `SCH-${Date.now()}-${schoolId.slice(0, 8)}`;
+
+    // Persist txRef so webhook / success handler can look up the school later
     school.registrationTxRef = txRef;
     await this.repo.save(school);
 
-    const payload = {
-      amount:       REGISTRATION_FEE,
-      currency:     'MWK',
-      email,
-      first_name:   school.name,
-      last_name:    'Registration',
-      callback_url: `${baseUrl}/api/school/payment/success`,
-      return_url:   `${baseUrl}/api/school/payment/failed`,
-      tx_ref:       txRef,
-      webhook_url:  `${baseUrl}/api/school/payment/webhook`,
-      meta:         { schoolId },
-    };
-
-    const response = await fetch('https://api.paychangu.com/payment', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${secretKey}`,
+    return {
+      secretKey, // browser needs this to call PayChangu — only safe over HTTPS
+      payload: {
+        amount:       REGISTRATION_FEE,
+        currency:     'MWK',
+        email,
+        first_name:   school.name,
+        last_name:    'Registration',
+        // PayChangu redirects the user's browser to these URLs after payment
+        callback_url: `${frontendUrl}/school/register?step=result&status=success`,
+        return_url:   `${frontendUrl}/school/register?step=result&status=failed`,
+        tx_ref:       txRef,
+        // PayChangu calls this silently from its own servers (no Render restriction)
+        webhook_url:  `${baseUrl}/api/school/payment/webhook`,
+        meta:         { schoolId },
       },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await response.json();
-
-    if (data.status === 'success') {
-      return {
-        message:              'Payment link generated',
-        checkoutUrl:          data.data.checkout_url,
-        transactionReference: txRef,
-        amount:               REGISTRATION_FEE,
-      };
-    } else {
-      throw new BadRequestException(data.message ?? 'Payment initiation failed');
-    }
+    };
   }
 
+  // ── Called by GET /school/payment/success (browser redirect from PayChangu) ──
   async handlePaymentSuccess(txRef: string) {
     const secretKey = this.configService.get<string>('PAYCHANGU_SECRET_KEY');
-    const response  = await fetch(
+    const response = await fetch(
       `https://api.paychangu.com/verify-payment/${txRef}`,
-      { method: 'GET', headers: { Accept: 'application/json', Authorization: `Bearer ${secretKey}` } },
+      {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${secretKey}`,
+        },
+      },
     );
     const data = await response.json();
     const isSuccessful =
-      data.status === 'success' && data.data &&
+      data.status === 'success' &&
+      data.data &&
       (data.data.status === 'success' || data.data.status === 'successful');
     if (isSuccessful) {
       await this.activateSchool(txRef, Number(data.data.amount ?? REGISTRATION_FEE));
@@ -109,6 +104,7 @@ export class SchoolService {
     return isSuccessful;
   }
 
+  // ── Called by POST /school/payment/webhook (PayChangu server → your server) ──
   async handleWebhook(payload: any) {
     const txRef  = payload?.tx_ref  ?? payload?.data?.tx_ref;
     const status = payload?.status  ?? payload?.data?.status;
@@ -133,7 +129,10 @@ export class SchoolService {
   }
 
   findOne(id: string) {
-    return this.repo.findOne({ where: { id }, relations: ['categories', 'resources', 'profiles'] });
+    return this.repo.findOne({
+      where: { id },
+      relations: ['categories', 'resources', 'profiles'],
+    });
   }
 
   getRegistrationFee() {

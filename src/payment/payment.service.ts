@@ -20,6 +20,8 @@ export class PaymentService {
     email: string,
     amount: number,
     resourceId?: string,
+    callbackUrl?: string, // optional override — e.g. frontend success page
+    returnUrl?: string,   // optional override — e.g. frontend failed page
   ) {
     const secretKey = this.configService.get<string>('PAYCHANGU_SECRET_KEY');
     if (!secretKey) {
@@ -31,7 +33,6 @@ export class PaymentService {
 
     const txRef = `LIB-${Date.now()}-${userId}`;
 
-    // FIX: use undefined instead of null – TypeORM DeepPartial does not accept null here
     const newPayment = this.paymentRepository.create({
       userId,
       amount,
@@ -41,8 +42,8 @@ export class PaymentService {
     });
     await this.paymentRepository.save(newPayment);
 
-    const baseUrl =
-      this.configService.get<string>('APP_BASE_URL')
+    const baseUrl = this.configService.get<string>('APP_BASE_URL');
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') ?? baseUrl;
 
     const payload = {
       amount,
@@ -50,8 +51,9 @@ export class PaymentService {
       email,
       first_name: 'Library',
       last_name: 'Member',
-      callback_url: `${baseUrl}/payment/success`,
-      return_url: `${baseUrl}/payment/failed`,
+      // Use caller-supplied URLs; fall back to legacy book-payment routes
+      callback_url: callbackUrl ?? `${frontendUrl}/payment/success`,
+      return_url: returnUrl ?? `${frontendUrl}/payment/failed`,
       tx_ref: txRef,
       webhook_url: `${baseUrl}/payment/webhook`,
       meta: resourceId ? { resourceId } : undefined,
@@ -260,5 +262,32 @@ export class PaymentService {
         'Payment was cancelled or failed. Your database has been updated.',
       transaction: txRef,
     };
+  }
+
+  // ─── School-specific payment initiator ──────────────────────────────────────
+  // Generates PayChangu redirect URLs that point back to the React frontend
+  // /school/register?step=result&status=... page instead of the API.
+  async initiateSchoolPayment(
+    schoolId: string,
+    email: string,
+    amount: number,
+  ) {
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') ??
+      this.configService.get<string>('APP_BASE_URL');
+
+    // PayChangu appends ?tx_ref=... automatically, but we pre-embed status so
+    // the React page knows what to display regardless of query-param order.
+    const callbackUrl = `${frontendUrl}/school/register?step=result&status=success`;
+    const returnUrl   = `${frontendUrl}/school/register?step=result&status=failed`;
+
+    return this.initiatePayment(
+      0,          // no userId for school registrations; adjust if you have one
+      email,
+      amount,
+      schoolId,   // resourceId — stored on the Payment row for webhook use
+      callbackUrl,
+      returnUrl,
+    );
   }
 }
