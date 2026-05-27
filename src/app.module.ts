@@ -25,6 +25,7 @@ import { ClassesModule } from './classes/classes.module';
 import { UserActivity } from './activity/user-activity.entity';
 import { ActivityModule } from './activity/activity.module';
 import { StorageModule } from './storage/storage.module';
+import { StructuredTestModule } from './structured-test/structured-test.module';
 
 @Module({
   imports: [
@@ -61,7 +62,8 @@ import { StorageModule } from './storage/storage.module';
     PaymentModule,
     ClassesModule,
     ActivityModule,
-    StorageModule
+    StorageModule,
+    StructuredTestModule
   ],
   controllers: [],
   providers: [SupabaseService],
