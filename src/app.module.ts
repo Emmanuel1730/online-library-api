@@ -40,10 +40,11 @@ import { StructuredTestModule } from './structured-test/structured-test.module';
       database: process.env.DB_NAME,
       entities: [Request, Settings, Profile, Resource, School, Category, Upload, Quiz, SchoolClass, UserActivity],
       autoLoadEntities: true,
-      synchronize: process.env.NODE_ENV !== 'production',
-      ssl: process.env.NODE_ENV === 'production' 
-        ? { rejectUnauthorized: false } 
-        : false,
+      synchronize: true,
+      // synchronize: process.env.NODE_ENV !== 'production',
+      // ssl: process.env.NODE_ENV === 'production' 
+      //   ? { rejectUnauthorized: false } 
+      //   : false,
       extra: {
         max: 3,         
         idleTimeoutMillis: 30000,
