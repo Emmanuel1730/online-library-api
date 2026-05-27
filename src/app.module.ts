@@ -39,9 +39,12 @@ import { StorageModule } from './storage/storage.module';
       database: process.env.DB_NAME,
       entities: [Request, Settings, Profile, Resource, School, Category, Upload, Quiz, SchoolClass, UserActivity],
       autoLoadEntities: true,
-      synchronize: true,
+      synchronize: process.env.NODE_ENV !== 'production',
+      ssl: process.env.NODE_ENV === 'production' 
+        ? { rejectUnauthorized: false } 
+        : false,
       extra: {
-        max: 10,          // max connections in pool
+        max: 3,         
         idleTimeoutMillis: 30000,
       },
     }),
