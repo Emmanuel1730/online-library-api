@@ -33,9 +33,6 @@ export class CreateProfileDto {
   @IsEnum(UserRole)
   role?: UserRole;
 
-  @IsString()
-  libraryCardNumber: string;
-
   @IsOptional()
   @IsUUID()
   schoolId?: string;

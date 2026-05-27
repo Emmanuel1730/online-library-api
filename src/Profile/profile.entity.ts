@@ -48,9 +48,6 @@ export class Profile {
   })
   role: UserRole;
 
-  @Column({ unique: true })
-  libraryCardNumber: string;
-
   @Column({ default: true })
   isActive: boolean;
 
