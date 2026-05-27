@@ -118,7 +118,7 @@ export class TestSubmission {
   percentage: number;
 
   @Column({ type: 'text', nullable: true })
-  teacherComment: string;
+  teacherComment: string | null;
 
   @CreateDateColumn()
   submittedAt: Date;
