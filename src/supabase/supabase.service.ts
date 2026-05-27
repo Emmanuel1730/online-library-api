@@ -12,6 +12,10 @@ export class SupabaseService {
     );
   }
 
+  get client() {
+    return this.supabase;
+  }
+
   async uploadFile(file: Express.Multer.File): Promise<string> {
     const fileName = `${Date.now()}-${file.originalname}`;
 

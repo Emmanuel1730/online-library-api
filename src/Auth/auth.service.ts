@@ -18,35 +18,27 @@ export class AuthService {
     @Inject(forwardRef(() => ProfileService))
     private profileService: ProfileService,
     private jwtService: JwtService,
+    // ✅ removed profileRepo — was causing the crash
   ) {}
 
   private formatUser(user: any) {
     return {
-      id: user.id,
+      id:        user.id,
       firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      role: user.role,
-      schoolId: user.school?.id ?? null
-    }
+      lastName:  user.lastName,
+      email:     user.email,
+      role:      user.role,
+      schoolId:  user.school?.id ?? null,
+    };
   }
 
-  // LOGIN FIXED
   async login(email: string, pass: string) {
     const user = await this.profileService.findByEmail(email);
 
-    if (!user) {
-      throw new UnauthorizedException('Invalid email or password');
-    }
+    if (!user) throw new UnauthorizedException('Invalid email or password');
 
-    const isValid = await this.profileService.validatePassword(
-      pass,
-      user.password,
-    );
-
-    if (!isValid) {
-      throw new UnauthorizedException('Invalid email or password');
-    }
+    const isValid = await this.profileService.validatePassword(pass, user.password);
+    if (!isValid) throw new UnauthorizedException('Invalid email or password');
 
     const schoolId: string | null = user.school?.id ?? null;
 
@@ -54,73 +46,41 @@ export class AuthService {
       throw new UnauthorizedException('User has no associated school');
     }
 
-    const tokens = await this.generateTokens(
-      user.id,
-      user.email,
-      user.role,
-      schoolId,
-    );
+    const tokens = await this.generateTokens(user.id, user.email, user.role, schoolId);
 
-    await this.profileService.updateProfile(user.id, {
-      refreshToken: tokens.refreshToken,
-    });
+    await this.profileService.updateProfile(user.id, { refreshToken: tokens.refreshToken });
 
     return {
-      accessToken: tokens.accessToken,
+      accessToken:  tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      user: this.formatUser(user),
+      user:         this.formatUser(user),
     };
   }
 
-  // REGISTER (already safe because service hashes password)
   async register(signUpDto: any) {
-    const userExists = await this.profileService.findByEmail(
-      signUpDto.email,
-    );
+    const userExists = await this.profileService.findByEmail(signUpDto.email);
+    if (userExists) throw new ConflictException('User already exists');
 
-    if (userExists) {
-      throw new ConflictException('User already exists');
-    }
-
-    const savedUser =
-      await this.profileService.createProfile(signUpDto);
-
+    const savedUser = await this.profileService.createProfile(signUpDto);
     const schoolId: string | null = savedUser.school?.id ?? null;
 
     if (savedUser.role !== UserRole.ADMIN && !schoolId) {
       throw new UnauthorizedException('User must belong to a school');
     }
 
-    const tokens = await this.generateTokens(
-      savedUser.id,
-      savedUser.email,
-      savedUser.role,
-      schoolId,
-    );
+    const tokens = await this.generateTokens(savedUser.id, savedUser.email, savedUser.role, schoolId);
 
-    await this.profileService.updateProfile(savedUser.id, {
-      refreshToken: tokens.refreshToken,
-    });
+    await this.profileService.updateProfile(savedUser.id, { refreshToken: tokens.refreshToken });
 
     return {
-      accessToken: tokens.accessToken,
+      accessToken:  tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      user: this.formatUser(savedUser),
+      user:         this.formatUser(savedUser),
     };
   }
 
-  async generateTokens(
-    userId: number,
-    email: string,
-    role: string,
-    schoolId: string | null,
-  ) {
-    const payload: any = {
-      sub: userId,
-      email,
-      role,
-    };
-
+  async generateTokens(userId: number, email: string, role: string, schoolId: string | null) {
+    const payload: any = { sub: userId, email, role };
     if (schoolId) payload.schoolId = schoolId;
 
     const [accessToken, refreshToken] = await Promise.all([
@@ -130,98 +90,75 @@ export class AuthService {
       }),
       this.jwtService.signAsync(payload, {
         expiresIn: '7d',
-        secret:
-          process.env.JWT_REFRESH_SECRET ||
-          'your-refresh-secret-key',
+        secret: process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
       }),
     ]);
 
-    return {
-      accessToken,
-      refreshToken,
-    };
+    return { accessToken, refreshToken };
   }
 
   async refreshToken(userId: number, refreshToken: string) {
-  const user =
-    await this.profileService.getProfileWithRequests(userId);
+    const user = await this.profileService.getProfileWithRequests(userId);
 
-  if (!user || user.refreshToken !== refreshToken) {
-    throw new UnauthorizedException('Invalid refresh token');
+    if (!user || user.refreshToken !== refreshToken) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const schoolId: string | null = user.school?.id ?? null;
+    const tokens = await this.generateTokens(user.id, user.email, user.role, schoolId);
+
+    await this.profileService.updateProfile(user.id, { refreshToken: tokens.refreshToken });
+
+    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken };
   }
 
-  const schoolId: string | null = user.school?.id ?? null;
-
-  // ✅ generate new tokens
-  const tokens = await this.generateTokens(
-    user.id,
-    user.email,
-    user.role,
-    schoolId,
-  );
-
-  // ✅ store NEW refresh token (rotation)
-  await this.profileService.updateProfile(user.id, {
-    refreshToken: tokens.refreshToken,
-  });
-
-  // ✅ return new tokens
-  return {
-    accessToken: tokens.accessToken,
-    refreshToken: tokens.refreshToken,
-  };
-}
-
   async logout(userId: number) {
-    await this.profileService.updateProfile(userId, {
-      refreshToken: null,
-    });
-
+    await this.profileService.updateProfile(userId, { refreshToken: null });
     return { message: 'Logged out successfully' };
   }
 
   async forgotPassword(email: string) {
     const user = await this.profileService.findByEmail(email);
-
-    if (!user) {
-      throw new NotFoundException('No account found');
-    }
+    if (!user) throw new NotFoundException('No account found');
 
     const resetToken = crypto.randomBytes(20).toString('hex');
-
-    const expires = new Date();
+    const expires    = new Date();
     expires.setHours(expires.getHours() + 1);
 
     await this.profileService.updateProfile(user.id, {
-      resetPasswordToken: resetToken,
+      resetPasswordToken:   resetToken,
       resetPasswordExpires: expires,
     });
 
-    return {
-      message: 'Reset token generated',
-      resetToken,
-    };
+    return { message: 'Reset token generated', resetToken };
   }
 
-  // FIXED RESET PASSWORD (hashed)
   async resetPassword(token: string, newPassword: string) {
-    const user =
-      await this.profileService.findByResetToken(token);
-
-    if (!user) {
-      throw new UnauthorizedException('Invalid or expired token');
-    }
+    const user = await this.profileService.findByResetToken(token);
+    if (!user) throw new UnauthorizedException('Invalid or expired token');
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     await this.profileService.updateProfile(user.id, {
-      password: hashedPassword,
-      resetPasswordToken: null,
+      password:             hashedPassword,
+      resetPasswordToken:   null,
       resetPasswordExpires: null,
     });
 
-    return {
-      message: 'Password reset successful',
-    };
+    return { message: 'Password reset successful' };
+  }
+
+  // ✅ uses profileService instead of the removed profileRepo
+  async changePassword(userId: number, currentPassword: string, newPassword: string) {
+    const profile = await this.profileService.findById(userId);
+    if (!profile) throw new UnauthorizedException('User not found');
+
+    const valid = await bcrypt.compare(currentPassword, profile.password);
+    if (!valid) throw new UnauthorizedException('Current password is incorrect');
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await this.profileService.updateProfile(userId, { password: hashed });
+
+    return { message: 'Password changed successfully' };
   }
 }

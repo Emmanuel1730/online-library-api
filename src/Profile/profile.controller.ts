@@ -67,4 +67,10 @@ export class ProfileController {
   async getMyProfile(@Req() req: any) {
     return this.profileService.getProfileWithRequests(req.user.id);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me')
+  updateMyProfile(@Req() req: any, @Body() data: any) {
+    return this.profileService.updateProfile(req.user.id, data);
+  }
 }

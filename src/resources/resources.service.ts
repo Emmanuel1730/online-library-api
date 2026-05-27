@@ -52,19 +52,13 @@ export class ResourcesService {
 
     const fileUrl = await this.supabaseService.uploadFile(file);
 
-    // ── Resolve premium fields ───────────────────────────────────
-    // isPremium comes from FormData as the string "true"/"false";
-    // the @Transform in the DTO converts it to a boolean for us.
     const isPremium = dto.isPremium ?? false;
-    // If someone marks a resource as premium but forgets to set a price,
-    // throw a clear error rather than silently saving price = 0.
     if (isPremium && (!dto.price || Number(dto.price) <= 0)) {
       throw new BadRequestException(
         'A premium resource must have a price greater than 0',
       );
     }
     const price = isPremium ? Number(dto.price) : 0;
-    // ────────────────────────────────────────────────────────────
 
     const resource = this.resourceRepo.create({
       title: dto.title,
@@ -145,7 +139,6 @@ export class ResourcesService {
       throw new ForbiddenException('Not allowed to edit this resource');
     }
 
-    // ── Handle premium update ────────────────────────────────────
     let premiumUpdate: Partial<Resource> = {};
     if (dto.isPremium !== undefined) {
       const isPremium = dto.isPremium;
@@ -157,7 +150,6 @@ export class ResourcesService {
       }
       premiumUpdate = { isPremium, price };
     }
-    // ────────────────────────────────────────────────────────────
 
     await this.resourceRepo.update(id, {
       ...(dto.title          && { title: dto.title }),
@@ -186,19 +178,42 @@ export class ResourcesService {
   async remove(id: string, user: JwtUser) {
     const resource = await this.resourceRepo.findOne({
       where: { id },
-      relations: ['uploads', 'school', 'uploader'],
+      relations: ['uploader'],
     });
-
     if (!resource) throw new NotFoundException('Resource not found');
 
     const isAdmin = user.role === UserRole.ADMIN;
     const isOwner = resource.uploader?.id === user.id;
 
-    if (!isAdmin && !isOwner) throw new ForbiddenException('Not allowed');
+    if (!isAdmin && !isOwner) {
+      throw new ForbiddenException('Not allowed to delete this resource');
+    }
 
-    await this.uploadRepo.delete({ resource: { id } as any });
+    if (resource.fileUrl) {
+      const bucket = 'online-library';
+      const bucketMarker = `/object/public/${bucket}/`;
+      let storagePath = resource.fileUrl;
+
+      if (resource.fileUrl.includes(bucketMarker)) {
+        storagePath = resource.fileUrl.split(bucketMarker)[1];
+      } else if (resource.fileUrl.includes(`/${bucket}/`)) {
+        storagePath = resource.fileUrl.split(`/${bucket}/`)[1];
+      }
+
+      const { error } = await this.supabaseService.client.storage
+        .from(bucket)
+        .remove([storagePath]);
+
+      if (error) {
+        console.error('[ResourceService.remove] Supabase delete error:', error.message);
+      }
+    }
+
+    await this.resourceRepo.manager.query(
+      `DELETE FROM upload WHERE "resourceId" = $1`,
+      [id],
+    );
+
     await this.resourceRepo.delete(id);
-
-    return { message: 'Deleted', id };
   }
 }
