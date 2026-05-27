@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan } from 'typeorm';
 import { Profile, UserRole } from './profile.entity';
@@ -12,27 +12,34 @@ export class ProfileService {
   ) {}
 
   async createProfile(data: any): Promise<Profile> {
-    const hashedPassword = await bcrypt.hash(data.password, 10);
+    try {
+      const hashedPassword = await bcrypt.hash(data.password, 10);
 
-    const profile = this.profileRepository.create({
-      ...data,
-      password: hashedPassword,
-      school: data.schoolId ? { id: data.schoolId } : undefined,
-    });
+      const profile = this.profileRepository.create({
+        ...data,
+        password: hashedPassword,
+        school: data.schoolId ? { id: data.schoolId } : undefined,
+      });
 
-    const saved = await this.profileRepository.save(profile);
-    const savedProfile = Array.isArray(saved) ? saved[0] : saved;
+      const saved = await this.profileRepository.save(profile);
+      const savedProfile = Array.isArray(saved) ? saved[0] : saved;
 
-    if (!savedProfile) throw new NotFoundException('Profile not saved correctly');
+      if (!savedProfile) throw new NotFoundException('Profile not saved correctly');
 
-    const fullProfile = await this.profileRepository.findOne({
-      where: { id: savedProfile.id },
-      relations: ['school'],
-    });
+      const fullProfile = await this.profileRepository.findOne({
+        where: { id: savedProfile.id },
+        relations: ['school'],
+      });
 
-    if (!fullProfile) throw new NotFoundException('Profile not found after creation');
+      if (!fullProfile) throw new NotFoundException('Profile not found after creation');
 
-    return fullProfile;
+      return fullProfile;
+    } catch (error) {
+      if (error?.code === '23505') {
+        throw new ConflictException('A user with this email already exists');
+      }
+      throw error;
+    }
   }
 
   getAllProfiles() {
