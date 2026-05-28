@@ -43,9 +43,7 @@ export class ProfileService {
   }
 
   getAllProfiles() {
-    return this.profileRepository.find({
-      relations: ['school', 'resources'],
-    });
+    return this.profileRepository.find({ relations: ['school'] });
   }
 
   async findByEmail(email: string): Promise<Profile | null> {

@@ -7,9 +7,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { Role } from './role.enum';
 import { Roles } from './roles.decorator';
-import { decorate } from 'reflect-metadata/no-conflict';
 
-// ... imports at the top remain the same
 
 @Injectable()
 export class RolesGuard implements CanActivate {

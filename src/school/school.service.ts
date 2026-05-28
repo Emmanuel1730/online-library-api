@@ -125,7 +125,10 @@ export class SchoolService {
   }
 
   findAll() {
-    return this.repo.find({ relations: ['categories', 'resources', 'profiles'] });
+    return this.repo.createQueryBuilder('school')
+      .loadRelationCountAndMap('school.profileCount', 'school.profiles')
+      .loadRelationCountAndMap('school.resourceCount', 'school.resources')
+      .getMany();
   }
 
   findOne(id: string) {

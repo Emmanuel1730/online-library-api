@@ -25,23 +25,23 @@ export class QuizzesService {
 
     const prompt = `Generate exactly 10 multiple choice quiz questions for a ${level} student in Malawi studying ${subject}, specifically on the topic: "${topic}".
 
-Respond ONLY with a valid JSON array. No explanation, no markdown, no extra text — just the raw JSON array.
+    Respond ONLY with a valid JSON array. No explanation, no markdown, no extra text — just the raw JSON array.
 
-Format:
-[
-  {
-    "question": "Question text here?",
-    "options": ["Option A", "Option B", "Option C", "Option D"],
-    "correct": 0
-  }
-]
+    Format:
+    [
+      {
+        "question": "Question text here?",
+        "options": ["Option A", "Option B", "Option C", "Option D"],
+        "correct": 0
+      }
+    ]
 
-Rules:
-- Each question must have exactly 4 options
-- "correct" is the zero-based index of the correct option
-- Questions must be appropriate for ${level} level
-- All 10 questions must be on the topic: ${topic}
-- Return exactly 10 questions`;
+    Rules:
+    - Each question must have exactly 4 options
+    - "correct" is the zero-based index of the correct option
+    - Questions must be appropriate for ${level} level
+    - All 10 questions must be on the topic: ${topic}
+    - Return exactly 10 questions`;
 
     try {
       const completion = await this.groq.chat.completions.create({
@@ -102,8 +102,7 @@ Rules:
       .getMany();
   }
 
-  // Students: see public quizzes + private quizzes from their school
-  // Also excludes 'ai-saved' quizzes from student browse
+
   async findForStudent(schoolId: string | null) {
     const qb = this.repo.createQueryBuilder('quiz')
       .where('quiz.status = :status', { status: 'published' })
@@ -205,13 +204,13 @@ Rules:
     });
   }
 
-  /** Admin: get all AI + teacher quiz attempts */
   async getAllAttempts() {
-    return this.attemptRepo.find({
-      relations: ['student'],
-      order: { completedAt: 'DESC' },
-      take: 200,
-    });
+    return this.attemptRepo.createQueryBuilder('a')
+      .leftJoin('a.student', 'student')
+      .addSelect(['student.id', 'student.firstName', 'student.lastName'])
+      .orderBy('a.completedAt', 'DESC')
+      .take(50) // 200 is too many; paginate instead
+      .getMany();
   }
 
   /** Admin: hard-delete any quiz */

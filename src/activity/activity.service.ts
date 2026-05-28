@@ -42,22 +42,32 @@
     }
 
     async getMyStats(userId: number) {
-      const all = await this.repo.find({ where: { userId } });
+      const result = await this.repo
+        .createQueryBuilder('a')
+        .select('a.action', 'action')
+        .addSelect('COUNT(*)', 'count')
+        .where('a.userId = :userId', { userId })
+        .groupBy('a.action')
+        .getRawMany();
 
-      const downloads    = all.filter((a) => a.action === ActivityAction.DOWNLOAD).length;
-      const quizzes      = all.filter((a) => a.action === ActivityAction.QUIZ_COMPLETED);
-      const quizzesCount = quizzes.length;
-      const pastPapers   = all.filter((a) => a.action === ActivityAction.RESOURCE_VIEWED).length;
+      const counts = Object.fromEntries(result.map(r => [r.action, parseInt(r.count)]));
 
-      const averageScore =
-        quizzesCount > 0
-          ? Math.round(
-              quizzes.reduce((sum, q) => sum + (q.metadata?.percentage ?? 0), 0) /
-                quizzesCount,
-            )
-          : 0;
+      // For average score, only fetch quiz attempts
+      const quizStats = await this.repo
+        .createQueryBuilder('a')
+        .select('AVG((a.metadata->>\'percentage\')::numeric)', 'avg')
+        .where('a.userId = :userId AND a.action = :action', {
+          userId,
+          action: ActivityAction.QUIZ_COMPLETED,
+        })
+        .getRawOne();
 
-      return { downloads, quizzesCount, pastPapers, averageScore };
+      return {
+        downloads: counts[ActivityAction.DOWNLOAD] ?? 0,
+        quizzesCount: counts[ActivityAction.QUIZ_COMPLETED] ?? 0,
+        pastPapers: counts[ActivityAction.RESOURCE_VIEWED] ?? 0,
+        averageScore: Math.round(Number(quizStats?.avg ?? 0)),
+      };
     }
 
     // ── Support ───────────────────────────────────────────────────────────────
