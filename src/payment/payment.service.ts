@@ -44,19 +44,16 @@ export class PaymentService {
 
     const baseUrl = this.configService.get<string>('APP_BASE_URL');
 
-
-    const appReturnUrl = `myapp://payment/result`;   
-
     const payload = {
       amount,
       currency: 'MWK',
       email,
       first_name: 'Library',
       last_name: 'Member',
-      callback_url: `${appReturnUrl}?tx_ref=${txRef}`,
-      return_url:   `${appReturnUrl}?tx_ref=${txRef}`,
+      callback_url: callbackUrl ?? `${baseUrl}/payment/success`,
+      return_url:   returnUrl   ?? `${baseUrl}/payment/success`,
       tx_ref: txRef,
-      webhook_url: `${baseUrl}/payment/webhook`,     
+      webhook_url: `${baseUrl}/payment/webhook`,
       meta: resourceId ? { resourceId } : undefined,
     };
 
