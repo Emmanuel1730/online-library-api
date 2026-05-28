@@ -41,18 +41,33 @@ export class ResourcesService {
       throw new ForbiddenException('Students cannot upload');
     }
 
-    const schoolId = user.schoolId;
-    const school = schoolId
-      ? await this.schoolRepo.findOne({ where: { id: schoolId } })
-      : null;
+    // Resolve schoolId:
+    // - For PRIVATE resources: use the teacher's own schoolId from their JWT
+    // - For PUBLIC resources: no school needed
+    // - dto.schoolId is intentionally ignored for teachers (they can't pick a school)
+    const isPrivate = dto.visibility === 'PRIVATE';
+    const schoolId  = isPrivate ? (user.schoolId ?? null) : null;
 
-    if (user.role !== UserRole.ADMIN && !school) {
-      throw new BadRequestException('Invalid school');
+    // Only validate school existence when the resource is private
+    if (isPrivate && user.role !== UserRole.ADMIN) {
+      if (!schoolId) {
+        throw new BadRequestException(
+          'Your account is not linked to a school. Cannot upload private resources.',
+        );
+      }
+      const school = await this.schoolRepo.findOne({ where: { id: schoolId } });
+      if (!school) {
+        throw new BadRequestException('School linked to your account was not found.');
+      }
     }
 
     const fileUrl = await this.supabaseService.uploadFile(file);
 
-    const isPremium = dto.isPremium ?? false;
+    // Teachers always upload free — isPremium/price from DTO only honoured for admins
+    const isPremium = user.role === UserRole.ADMIN
+      ? (dto.isPremium ?? false)
+      : false;
+
     if (isPremium && (!dto.price || Number(dto.price) <= 0)) {
       throw new BadRequestException(
         'A premium resource must have a price greater than 0',
@@ -61,34 +76,34 @@ export class ResourcesService {
     const price = isPremium ? Number(dto.price) : 0;
 
     const resource = this.resourceRepo.create({
-      title: dto.title,
-      description: dto.description,
-      type: dto.type,
-      form: dto.form,
-      status: dto.status,
+      title:          dto.title,
+      description:    dto.description,
+      type:           dto.type,
+      form:           dto.form,
+      status:         dto.status,
       targetAudience: dto.targetAudience,
-      visibility: dto.visibility,
+      visibility:     dto.visibility,
       fileUrl,
-      isActive: true,
+      isActive:       true,
       isPremium,
       price,
-      category: dto.categoryId ? ({ id: dto.categoryId } as any) : null,
-      targetClass: dto.classId ? ({ id: dto.classId } as any) : null,
-      school: schoolId ? ({ id: schoolId } as any) : null,
-      uploaderId: String(user.id),
-      uploader: { id: user.id } as any,
+      category:    dto.categoryId ? ({ id: dto.categoryId } as any) : null,
+      targetClass: dto.classId    ? ({ id: dto.classId }    as any) : null,
+      school:      schoolId       ? ({ id: schoolId }       as any) : null,
+      uploaderId:  String(user.id),
+      uploader:    { id: user.id } as any,
     });
 
     const savedResource = await this.resourceRepo.save(resource);
 
     const upload = this.uploadRepo.create({
       fileUrl,
-      filePath: fileUrl,
-      fileType: file.mimetype,
-      fileSize: file.size,
+      filePath:   fileUrl,
+      fileType:   file.mimetype,
+      fileSize:   file.size,
       uploaderId: String(user.id),
-      schoolId: String(user.schoolId),
-      resource: savedResource,
+      schoolId:   schoolId ? String(schoolId) : String(user.schoolId ?? ''),
+      resource:   savedResource,
     });
 
     const savedUpload = await this.uploadRepo.save(upload);
@@ -102,10 +117,10 @@ export class ResourcesService {
   async findAll(user: JwtUser, query: any) {
     const qb = this.resourceRepo
       .createQueryBuilder('resource')
-      .leftJoinAndSelect('resource.category', 'category')
-      .leftJoinAndSelect('resource.school', 'school')
-      .leftJoinAndSelect('resource.uploader', 'uploader')
-      .leftJoinAndSelect('resource.uploads', 'uploads')
+      .leftJoinAndSelect('resource.category',    'category')
+      .leftJoinAndSelect('resource.school',      'school')
+      .leftJoinAndSelect('resource.uploader',    'uploader')
+      .leftJoinAndSelect('resource.uploads',     'uploads')
       .leftJoinAndSelect('resource.targetClass', 'targetClass')
       .where('resource.isActive = true');
 
@@ -140,9 +155,9 @@ export class ResourcesService {
     }
 
     let premiumUpdate: Partial<Resource> = {};
-    if (dto.isPremium !== undefined) {
+    if (isAdmin && dto.isPremium !== undefined) {
       const isPremium = dto.isPremium;
-      const price = isPremium ? Number(dto.price ?? resource.price) : 0;
+      const price     = isPremium ? Number(dto.price ?? resource.price) : 0;
       if (isPremium && price <= 0) {
         throw new BadRequestException(
           'A premium resource must have a price greater than 0',
@@ -152,15 +167,15 @@ export class ResourcesService {
     }
 
     await this.resourceRepo.update(id, {
-      ...(dto.title          && { title: dto.title }),
-      ...(dto.description    && { description: dto.description }),
-      ...(dto.type           && { type: dto.type }),
-      ...(dto.form           && { form: dto.form }),
-      ...(dto.status         && { status: dto.status }),
+      ...(dto.title          && { title:          dto.title          }),
+      ...(dto.description    && { description:    dto.description    }),
+      ...(dto.type           && { type:           dto.type           }),
+      ...(dto.form           && { form:           dto.form           }),
+      ...(dto.status         && { status:         dto.status         }),
       ...(dto.targetAudience && { targetAudience: dto.targetAudience }),
-      ...(dto.visibility     && { visibility: dto.visibility }),
-      ...(dto.categoryId     && { category: { id: dto.categoryId } as any }),
-      ...(dto.classId        && { targetClass: { id: dto.classId } as any }),
+      ...(dto.visibility     && { visibility:     dto.visibility     }),
+      ...(dto.categoryId     && { category:    { id: dto.categoryId } as any }),
+      ...(dto.classId        && { targetClass: { id: dto.classId }   as any }),
       ...premiumUpdate,
     });
 
@@ -190,9 +205,9 @@ export class ResourcesService {
     }
 
     if (resource.fileUrl) {
-      const bucket = 'online-library';
+      const bucket       = 'online-library';
       const bucketMarker = `/object/public/${bucket}/`;
-      let storagePath = resource.fileUrl;
+      let storagePath    = resource.fileUrl;
 
       if (resource.fileUrl.includes(bucketMarker)) {
         storagePath = resource.fileUrl.split(bucketMarker)[1];
