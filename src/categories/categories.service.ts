@@ -29,13 +29,8 @@ export class CategoriesService {
   }
 
   async findAll(user: any) {
-    // Admins with no schoolId get all categories; otherwise filter by school
-    const schoolId =
-      user.role === UserRole.ADMIN ? user.schoolId ?? undefined : user.schoolId;
-
-    return this.repo.find({
-      where: schoolId ? { school: { id: schoolId } } : {},
-      relations: ['school', 'resources'],
-    });
-  }
+  return this.repo.find({
+    relations: ['school', 'resources'],
+  });
+}
 }
